@@ -1,0 +1,4200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carro Policia 3D</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #1a1a2e; font-family: sans-serif; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 18px;
+            z-index: 20;
+        }
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6666;
+            font-size: 16px;
+            z-index: 20;
+            display: none;
+            text-align: center;
+            max-width: 500px;
+        }
+        .overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            background: linear-gradient(160deg, rgba(10,15,30,0.97) 0%, rgba(20,30,60,0.94) 60%, rgba(8,15,32,0.98) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+        .overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        /* Fondo animado del menú (luces desenfocadas) */
+        #menu::before, #menu::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: 0.35;
+            pointer-events: none;
+        }
+        #menu::before {
+            width: 520px; height: 520px;
+            background: radial-gradient(circle, #3b82f6, transparent 70%);
+            top: -10%; left: -8%;
+            animation: floatLight 9s ease-in-out infinite;
+        }
+        #menu::after {
+            width: 460px; height: 460px;
+            background: radial-gradient(circle, #f43f5e, transparent 70%);
+            bottom: -12%; right: -8%;
+            animation: floatLight 11s ease-in-out infinite reverse;
+        }
+        @keyframes floatLight {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(30px,-25px) scale(1.06); }
+        }
+        .menu-inner {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            padding: 20px;
+            max-width: 560px;
+            width: 100%;
+            animation: fadeUp 0.6s ease both;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #menu h1 {
+            color: #eaf4ff;
+            font-size: clamp(28px, 5vw, 46px);
+            letter-spacing: 1.5px;
+            text-shadow: 0 4px 24px rgba(80,160,255,0.5);
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #60a5fa, #f472b6, #60a5fa);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            animation: titleShine 6s linear infinite;
+        }
+        @keyframes titleShine {
+            from { background-position: 0% center; }
+            to { background-position: 200% center; }
+        }
+        #menu h1 .accent {
+            background: linear-gradient(90deg, #fbbf24, #ff6b6b, #fbbf24);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: accentPulse 2.4s ease-in-out infinite;
+        }
+        @keyframes accentPulse {
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(251,191,36,0.6)); }
+            50% { filter: drop-shadow(0 0 18px rgba(255,107,107,0.9)); }
+        }
+        #menu p.sub {
+            color: #9fb4c7;
+            font-size: 15px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .menu-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .menu-btn {
+            animation: fadeUp 0.55s ease both;
+        }
+        .menu-cards .menu-btn:nth-child(1) { animation-delay: 0.05s; }
+        .menu-cards .menu-btn:nth-child(2) { animation-delay: 0.12s; }
+        .menu-cards .menu-btn:nth-child(3) { animation-delay: 0.19s; }
+        .menu-cards .menu-btn:nth-child(4) { animation-delay: 0.26s; }
+        .menu-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            width: 100%;
+            padding: 18px 20px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            background: rgba(255,255,255,0.05);
+            color: #eaf4ff;
+            cursor: pointer;
+            text-align: left;
+            overflow: hidden;
+            transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+        }
+        .menu-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(96,165,250,0.18), rgba(244,63,94,0.12));
+            opacity: 0;
+            transition: opacity 0.22s ease;
+            pointer-events: none;
+        }
+        .menu-btn:hover::before { opacity: 1; }
+        .menu-btn:hover {
+            transform: translateY(-3px) scale(1.01);
+            border-color: rgba(96,165,250,0.6);
+            box-shadow: 0 10px 32px rgba(20,40,80,0.5);
+            background: rgba(255,255,255,0.07);
+        }
+        .menu-btn:active {
+            transform: translateY(-1px) scale(0.98);
+            transition-duration: 0.06s;
+        }
+        .menu-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none;
+        }
+        .menu-btn .icon {
+            flex: 0 0 auto;
+            width: 52px; height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative; z-index: 2;
+        }
+        .menu-btn .txt { position: relative; z-index: 2; }
+        .menu-btn .txt strong {
+            display: block;
+            font-size: 19px;
+            letter-spacing: 0.4px;
+            margin-bottom: 3px;
+        }
+        .menu-btn .txt small {
+            display: block;
+            color: #a9c2e0;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+        .menu-btn .arrow {
+            margin-left: auto;
+            position: relative; z-index: 2;
+            color: #60a5fa;
+            font-size: 20px;
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: all 0.22s ease;
+        }
+        .menu-btn:hover .arrow { opacity: 1; transform: translateX(0); }
+        /* Personalizar color por modo */
+        .menu-btn[data-mode="fugitivo"] .icon { color:#f87171; }
+        .menu-btn[data-mode="policia"] .icon { color:#60a5fa; }
+        .menu-btn[data-mode="libre"] .icon { color:#34d399; }
+        .menu-footer {
+            color: #7d8ba1;
+            font-size: 12px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+        /* ===== Pantalla de selección de modo ===== */
+        #select .select-box {
+            position: relative; z-index: 2;
+            width: 100%;
+            max-width: 420px;
+            background: rgba(8,14,30,0.9);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            padding: 28px 26px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            animation: fadeUp 0.4s ease both;
+        }
+        #select h2 {
+            color: #eaf4ff;
+            font-size: 26px;
+            margin-bottom: 4px;
+        }
+        #select .sel-sub { color: #9fb4c7; font-size: 14px; margin-bottom: 20px; }
+        .opt-group { margin-bottom: 16px; text-align: left; }
+        .opt-group label {
+            display: block;
+            color: #7d8ba1;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .opt-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .opt-chip {
+            padding: 9px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.05);
+            color: #cfe2f5;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex: 1;
+            text-align: center;
+        }
+        .opt-chip:hover { background: rgba(255,255,255,0.1); }
+        .opt-chip.selected {
+            background: rgba(96,165,250,0.25);
+            border-color: #60a5fa;
+            color: #fff;
+            box-shadow: 0 0 0 1px rgba(96,165,250,0.4);
+        }
+        .select-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 22px;
+        }
+        .btn-primary, .btn-ghost {
+            flex: 1;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(120deg, #2563eb, #4f46e5);
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(37,99,235,0.45);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(37,99,235,0.55); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-ghost {
+            background: rgba(255,255,255,0.06);
+            color: #cfe2f5;
+            border: 1px solid rgba(255,255,255,0.14);
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+        /* ===== LOBBY MULTIJUGADOR ===== */
+        .ol-input {
+            flex: 1;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.06);
+            color: #eaf4ff;
+            font-size: 18px;
+            letter-spacing: 4px;
+            text-align: center;
+            outline: none;
+            transition: all 0.15s ease;
+        }
+        .ol-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 2px rgba(96,165,250,0.3); }
+        #online .btn-primary, #online .btn-ghost { flex: none; }
+        #olStatus.online-wait { color: #fbbf24; }
+        #olStatus.online-error { color: #f87171; }
+        #olRoleLabel { color: #eaf4ff; font-size: 14px; text-transform: none; letter-spacing: 0; }
+        #olCode {
+            display: block;
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: 10px;
+            text-align: center;
+            color: #60a5fa;
+            margin: 10px 0;
+            background: rgba(96,165,250,0.1);
+            border-radius: 14px;
+            padding: 10px 0;
+            border: 1px dashed rgba(96,165,250,0.5);
+        }
+        .ol-input.plain { letter-spacing: 0; text-align: left; font-size: 15px; }
+        .ol-input.chat { letter-spacing: 0; text-align: left; font-size: 14px; padding: 9px 12px; }
+        .ol-players { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .ol-player-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 20px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            font-size: 13px; color: #eaf4ff;
+        }
+        .ol-player-chip.cop { border-color: rgba(255,107,107,0.5); color: #ffb3b3; }
+        .ol-player-chip.fug { border-color: rgba(251,191,36,0.5); color: #ffe0a3; }
+        #olChatList {
+            height: 130px; overflow-y: auto;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px; padding: 8px 10px;
+            font-size: 13px; color: #e2e8f0;
+            display: flex; flex-direction: column; gap: 2px;
+            margin-top: 6px;
+        }
+        .ol-chat-input { display: flex; gap: 8px; margin-top: 8px; }
+        .ol-chat-input .btn-ghost { flex: none; }
+        /* ===== HUD ===== */
+        #hud {
+            position: absolute;
+            inset: 0;
+            z-index: 15;
+            pointer-events: none;
+            display: none;
+            font-family: 'Segoe UI', sans-serif;
+            color: #eaf4ff;
+        }
+        #hud.visible { display: block; }
+        .hud-top {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .hud-panel {
+            background: rgba(5,10,25,0.72);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 12px 16px;
+            backdrop-filter: blur(6px);
+            min-width: 140px;
+        }
+        .hud-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+        .hud-row { font-size: 13px; color: #cfe2f5; margin-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
+        .hud-row b { color: #fff; }
+        .bar {
+            height: 8px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.12);
+            overflow: hidden;
+            margin-top: 7px;
+        }
+        .bar > i {
+            display: block;
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #3b82f6, #22d3ee);
+            transition: width 0.3s ease;
+        }
+        .hud-bottom {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            background: rgba(5,10,25,0.72);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 10px 22px;
+            backdrop-filter: blur(6px);
+        }
+        .speed-val { font-size: 34px; font-weight: 700; line-height: 1; }
+        .speed-unit { font-size: 12px; color: #9fb4c7; margin-left: 4px; }
+        .hud-feed {
+            position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 14px;
+            color: #ffd270;
+            min-height: 20px;
+            letter-spacing: 0.4px;
+        }
+        .countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -60%);
+            font-size: 120px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 30px rgba(96,165,250,0.9), 0 4px 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 30;
+            letter-spacing: 2px;
+            animation: fadePulse 1s ease-in-out infinite;
+        }
+        .countdown.go {
+            color: #4ade80;
+            text-shadow: 0 0 40px rgba(74,222,128,0.9), 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 90px;
+        }
+        @keyframes fadePulse {
+            0% { transform: translate(-50%, -60%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -60%) scale(1.2); opacity: 0.85; }
+            100% { transform: translate(-50%, -60%) scale(1); opacity: 1; }
+        }
+        /* ===== Resultados ===== */
+        #result .result-box {
+            position: relative; z-index: 2;
+            max-width: 400px;
+            width: 100%;
+            background: rgba(8,14,30,0.92);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            padding: 30px 28px;
+            text-align: center;
+            box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+            animation: fadeUp 0.45s ease both;
+        }
+        #result .res-emoji { font-size: 52px; }
+        #result h2 { color: #eaf4ff; font-size: 30px; margin: 6px 0 4px; }
+        #result .res-sub { color: #9fb4c7; font-size: 14px; margin-bottom: 18px; }
+        .res-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .res-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+        .res-stat span { color: #7d8ba1; }
+        .res-stat b { color: #fff; }
+        #result .res-actions { display: flex; flex-direction: column; gap: 10px; }
+        /* ===== Controles táctiles ===== */
+        #touch {
+            position: absolute;
+            inset: 0;
+            z-index: 16;
+            display: none;
+            pointer-events: none;
+        }
+        #touch.on { display: block; }
+        #touch .tpad {
+            position: absolute;
+            bottom: 22px;
+            width: 150px; height: 110px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            pointer-events: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+        }
+        #touch .tpad.l { left: 16px; }
+        #touch .tpad.r { right: 16px;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
+        .tbtn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #fff;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .tbtn:active { color: #60a5fa; }
+        @media (max-width: 700px) {
+            #info { font-size: 11px; padding: 6px 12px; }
+            .hud-top { position: absolute; top: 10px; left: 10px; right: 10px; }
+            .hud-bottom { bottom: 150px; }
+            .menu-btn { padding: 14px 14px; }
+            .menu-btn .icon { width: 44px; height: 44px; font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="menu" class="overlay">
+        <div class="menu-inner">
+            <h1>INVASIÓN <span class="accent">POLICIAL</span></h1>
+            <p class="sub">Elige tu rol y vive la persecución en la carretera del bosque.</p>
+            <div class="menu-cards">
+                <button class="menu-btn" data-mode="fugitivo">
+                    <span class="icon">🚨</span>
+                    <span class="txt"><strong>SER FUGITIVO</strong><small>Escapa de la policía y sobrevive el mayor tiempo posible.</small></span>
+                    <span class="arrow">›</span>
+                </button>
+                <button class="menu-btn" data-mode="policia">
+                    <span class="icon">🚓</span>
+                    <span class="txt"><strong>SER POLICÍA</strong><small>Persigue al fugitivo y consigue detenerlo.</small></span>
+                    <span class="arrow">›</span>
+                </button>
+                <button class="menu-btn" data-mode="libre">
+                    <span class="icon">🏎️</span>
+                    <span class="txt"><strong>CONDUCCIÓN LIBRE</strong><small>Explora el mapa sin límites.</small></span>
+                    <span class="arrow">›</span>
+                </button>
+                <button class="menu-btn" data-mode="online" id="btnOnline">
+                    <span class="icon">🌐</span>
+                    <span class="txt"><strong>MULTIJUGADOR EN LÍNEA</strong><small>Enfrenta a otro jugador: policía vs fugitivo.</small></span>
+                    <span class="arrow">›</span>
+                </button>
+            </div>
+            <div class="menu-footer">WASD · Shift drift · F sirena · C cámara · ESC menú</div>
+        </div>
+    </div>
+
+    <!-- Pantalla de selección de modo -->
+    <div id="select" class="overlay hidden">
+        <div class="select-box">
+            <h2 id="selTitle">Configurar</h2>
+            <p class="sel-sub" id="selSub">Personaliza tu sesión</p>
+            <div class="opt-group">
+                <label>Vehículo</label>
+                <div class="opt-row" id="optVehicle">
+                    <div class="opt-chip selected" data-val="auto">Auto</div>
+                </div>
+            </div>
+            <div class="opt-group">
+                <label>Hora del día</label>
+                <div class="opt-row" id="optTime">
+                    <div class="opt-chip selected" data-val="dia">Día</div>
+                    <div class="opt-chip" data-val="tarde">Tarde</div>
+                    <div class="opt-chip" data-val="noche">Noche</div>
+                </div>
+            </div>
+            <div class="opt-group">
+                <label>Clima</label>
+                <div class="opt-row" id="optWeather">
+                    <div class="opt-chip selected" data-val="despejado">Despejado</div>
+                    <div class="opt-chip" data-val="lluvia">Lluvia</div>
+                </div>
+            </div>
+            <div class="opt-group">
+                <label>Dificultad</label>
+                <div class="opt-row" id="optDifficulty">
+                    <div class="opt-chip" data-val="facil">Fácil</div>
+                    <div class="opt-chip selected" data-val="normal">Normal</div>
+                    <div class="opt-chip" data-val="dificil">Difícil</div>
+                </div>
+            </div>
+            <div class="select-actions">
+                <button class="btn-ghost" id="btnBack">← VOLVER</button>
+                <button class="btn-primary" id="btnPlay">JUGAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lobby multijugador en línea -->
+    <div id="online" class="overlay hidden">
+        <div class="select-box" style="max-width:520px">
+            <h2 id="olTitle">🌐 MULTIJUGADOR EN LÍNEA</h2>
+            <p class="sel-sub">Policía vs Fugitivo · salas de hasta 4 jugadores</p>
+            <div class="opt-group" id="olActions">
+                <div class="opt-group">
+                    <label>Tu nombre</label>
+                    <input id="olNick" class="ol-input plain" placeholder="Nombre (p. ej. Colitas)" maxlength="16" value="" />
+                    <button class="btn-ghost" id="btnSaveNick" style="margin-top:8px">GUARDAR NOMBRE</button>
+                </div>
+                <button class="btn-primary" id="btnCreateRoom" style="width:100%">CREAR SALA</button>
+                <div style="height:14px"></div>
+                <label>o únete con un código:</label>
+                <div class="opt-row" style="justify-content:center; gap:8px; margin-top:8px">
+                    <input id="olJoinCode" class="ol-input" placeholder="EJ: 7K2P" maxlength="4" style="text-transform:uppercase" />
+                    <button class="btn-ghost" id="btnJoinRoom">UNIRSE</button>
+                </div>
+            </div>
+            <div class="opt-group" id="olWaiting" style="display:none">
+                <label id="olRoleLabel">Tu rol: <b id="olRole"></b></label>
+                <div id="olCode"></div>
+                <p id="olStatus" class="sel-sub" style="color:#fbbf24">Esperando jugadores…</p>
+                <div class="ol-players" id="olPlayers"></div>
+                <button class="btn-primary" id="btnStartRoom" style="width:100%; display:none">🚦 INICIAR PARTIDA</button>
+                <div style="height:8px"></div>
+                <button class="btn-ghost" id="btnCopyCode">📋 COPIAR CÓDIGO</button>
+                <div style="height:8px"></div>
+                <button class="btn-ghost" id="btnCancelOnline">← CANCELAR / SALIR</button>
+                <div style="height:14px"></div>
+                <label>💬 Chat de la sala</label>
+                <div id="olChatList"></div>
+                <div class="ol-chat-input">
+                    <input id="olChatInput" class="ol-input chat" placeholder="Escribe un mensaje…" maxlength="200" />
+                    <button class="btn-ghost" id="btnSendChat">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados -->
+    <div id="result" class="overlay hidden">
+        <div class="result-box">
+            <div class="res-emoji" id="resEmoji">🏆</div>
+            <h2 id="resTitle">HAS ESCAPADO</h2>
+            <p class="res-sub" id="resSub">Persecución completada</p>
+            <div class="res-stats" id="resStats"></div>
+            <div class="res-actions">
+                <button class="btn-primary" id="btnRetry">JUGAR DE NUEVO</button>
+                <button class="btn-ghost" id="btnResultMenu">VOLVER AL MENÚ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD durante el juego -->
+    <div id="hud">
+        <div class="hud-top">
+            <div class="hud-panel" id="hudLeft">
+                <div class="hud-title" id="hudLeftTitle">🚨 PERSECUCIÓN</div>
+                <div class="hud-row"><span>Policías</span><b id="hudPolice">0</b></div>
+                <div class="hud-row"><span>Distancia</span><b id="hudDist">0 m</b></div>
+                <div class="hud-row"><span>Tiempo</span><b id="hudTime">00:00</b></div>
+            </div>
+            <div class="hud-panel" id="hudRight" style="display:none">
+                <div class="hud-title" id="hudRightTitle">🚨 ALERTA</div>
+                <div class="hud-row"><span>Nivel</span><b id="hudAlertLevel">1</b></div>
+                <div class="bar"><i id="hudAlertBar" style="width:33%"></i></div>
+            </div>
+        </div>
+        <div class="hud-feed" id="hudFeed"></div>
+        <div class="countdown" id="countdown" style="display:none"></div>
+        <div class="hud-bottom">
+            <span class="speed-val" id="hudSpeed">0</span><span class="speed-unit">km/h</span>
+            <div style="font-size:11px;color:#7d8ba1" id="hudGear">Marcha 1 · RPM 0</div>
+        </div>
+    </div>
+
+    <!-- Controles táctiles -->
+    <div id="touch">
+        <div class="tpad l" id="tLeft">
+            <div></div><div class="tbtn" data-k="w">▲</div><div></div>
+            <div class="tbtn" data-k="a">◀</div><div></div><div class="tbtn" data-k="d">▶</div>
+            <div></div><div class="tbtn" data-k="s">▼</div><div></div>
+        </div>
+        <div class="tpad r" id="tRight">
+            <div class="tbtn" data-k="shift">↻</div><div class="tbtn" data-k="f">🚨</div>
+        </div>
+    </div>
+
+    <div id="info">W <span style="color:#aaa">adelante</span> | A/D <span style="color:#aaa">girar</span> | S <span style="color:#aaa">freno/reversa</span> | Shift <span style="color:#aaa">derrapar</span> | F <span style="color:#aaa">sirena</span> | C o 1/2/3 <span style="color:#aaa">cámaras</span> | ESC <span style="color:#aaa">menú</span></div>
+    <div id="loading">Cargando modelo 3D...</div>
+    <div id="error"></div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="supabase.js"></script>
+    <script>
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+
+        var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(0, 2.5, -6);
+
+        var renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+
+        var controls = null;
+
+        scene.background = new THREE.Color(0x87ceeb);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+        var sun = new THREE.DirectionalLight(0xffffff, 2.2);
+        sun.position.set(50, 80, 30);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = 1000;
+        sun.shadow.camera.left = -500;
+        sun.shadow.camera.right = 500;
+        sun.shadow.camera.top = 500;
+        sun.shadow.camera.bottom = -500;
+        sun.shadow.bias = -0.001;
+        scene.add(sun);
+
+        var hemi = new THREE.HemisphereLight(0xdff0ff, 0x4a7a4a, 1.1);
+        scene.add(hemi);
+        var ambient = new THREE.AmbientLight(0xffffff, 0.35);
+        scene.add(ambient);
+
+        // Luz puntual que sigue al carro: garantiza que el modelo quede bien iluminado
+        // desde cualquier ángulo de cámara (evita el lado oscuro).
+        var carLight = new THREE.PointLight(0xffffff, 0.9, 60);
+        carLight.position.set(0, 8, 0);
+        scene.add(carLight);
+
+        var MAP = 2000;
+        scene.background = new THREE.Color(0x87ceeb);
+
+        // Función de altura del terreno: ondulaciones suaves (subidas y bajadas)
+        function terrainHeight(x, z) {
+            // Terreno plano (sin subidas ni bajadas)
+            return 0;
+        }
+
+        var groundGeometry = new THREE.PlaneGeometry(MAP, MAP, 200, 200);
+        groundGeometry.rotateX(-Math.PI / 2);
+        var groundMaterial = new THREE.MeshStandardMaterial({ color: 0x4a7a33, roughness: 1.0 });
+        var ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.receiveShadow = true;
+        scene.add(ground);
+        var gpos = ground.geometry.attributes.position;
+        for (var gi = 0; gi < gpos.count; gi++) {
+            var gx = gpos.getX(gi);
+            var gz = gpos.getZ(gi);
+            gpos.setY(gi, terrainHeight(gx, gz));
+        }
+        gpos.needsUpdate = true;
+        ground.geometry.computeVertexNormals();
+
+        // Carretera en loop cerrado, MUY grande, con trazado de carreras: curvas suaves Y cerradas,
+        // chicanes que te hacen girar a izquierda y a derecha, secciones rectas, dentro del mapa 2000x2000.
+        var roadCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 0, -860),      // unión / salida inicial (sur)
+            new THREE.Vector3(200, 0, -790),
+            new THREE.Vector3(360, 0, -680),
+            new THREE.Vector3(500, 0, -540),
+            new THREE.Vector3(620, 0, -380),
+            new THREE.Vector3(740, 0, -200),
+            new THREE.Vector3(820, 0, 0),
+            new THREE.Vector3(760, 0, 160),     // chicane: giro cerrado a la derecha
+            new THREE.Vector3(600, 0, 130),     // ...y a la izquierda (S)
+            new THREE.Vector3(560, 0, 260),
+            new THREE.Vector3(400, 0, 360),
+            new THREE.Vector3(220, 0, 440),
+            new THREE.Vector3(20, 0, 520),
+            new THREE.Vector3(-180, 0, 620),
+            new THREE.Vector3(-380, 0, 700),
+            new THREE.Vector3(-560, 0, 740),
+            new THREE.Vector3(-720, 0, 640),    // curva amplia a la izquierda (noroeste)
+            new THREE.Vector3(-840, 0, 480),
+            new THREE.Vector3(-900, 0, 280),
+            new THREE.Vector3(-880, 0, 60),
+            new THREE.Vector3(-760, 0, -80),
+            new THREE.Vector3(-640, 0, -60),    // chicane: giro a la derecha
+            new THREE.Vector3(-560, 0, -160),   // ...y a la izquierda (S)
+            new THREE.Vector3(-640, 0, -260),
+            new THREE.Vector3(-740, 0, -240),
+            new THREE.Vector3(-820, 0, -360),   // curva cerrada a la derecha (suroeste)
+            new THREE.Vector3(-780, 0, -540),
+            new THREE.Vector3(-650, 0, -700),
+            new THREE.Vector3(-450, 0, -800),
+            new THREE.Vector3(-230, 0, -860),
+            new THREE.Vector3(0, 0, -870)       // cierra suave hacia el punto 0 (sur)
+        ], true);
+        // Alinear la altura de la carretera con el terreno en cada punto de control
+        for (var cc = 0; cc < roadCurve.points.length; cc++) {
+            var cp = roadCurve.points[cc];
+            cp.y = terrainHeight(cp.x, cp.z);
+        }
+
+        var ROAD_W = 8;
+        var roadPts = roadCurve.getPoints(1400);
+        // Alinear cada punto central de la curva a la altura de la tierra (a nivel con el pasto)
+        for (var rpBase = 0; rpBase < roadPts.length; rpBase++) {
+            var tp = roadPts[rpBase];
+            tp.y = Math.max(tp.y, terrainHeight(tp.x, tp.z)) + 0.03;
+        }
+        var roadGeo = new THREE.BufferGeometry();
+        var positions = [];
+        for (var rp = 0; rp < roadPts.length; rp++) {
+            var t = roadPts[rp];
+            var tangent = roadCurve.getTangent(rp / (roadPts.length - 1));
+            tangent.normalize();
+            var perp = new THREE.Vector3(-tangent.z, 0, tangent.x);
+            perp.normalize();
+            // Elevar cada borde de la vía también por encima del pasto
+            var lx = t.x + perp.x * ROAD_W / 2;
+            var lz = t.z + perp.z * ROAD_W / 2;
+            var rx = t.x - perp.x * ROAD_W / 2;
+            var rz = t.z - perp.z * ROAD_W / 2;
+            var ly = Math.max(t.y, terrainHeight(lx, lz)) + 0.03;
+            var ry = Math.max(t.y, terrainHeight(rx, rz)) + 0.03;
+            positions.push(lx, ly, lz);
+            positions.push(rx, ry, rz);
+        }
+        var indices = [];
+        for (var rpi = 0; rpi < roadPts.length - 1; rpi++) {
+            var a = rpi * 2, b = rpi * 2 + 1, c = (rpi + 1) * 2, d = (rpi + 1) * 2 + 1;
+            indices.push(a, c, b, b, c, d);
+        }
+        roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        roadGeo.setIndex(indices);
+        roadGeo.computeVertexNormals();
+        var road = new THREE.Mesh(roadGeo, new THREE.MeshStandardMaterial({ color: 0x3b3b42, roughness: 0.8 }));
+        road.receiveShadow = true;
+        scene.add(road);
+
+        // Señalización de la carretera: cintas que siguen las curvas y la altura
+        function makeRoadLine(offset, width, color) {
+            var mat = new THREE.MeshBasicMaterial({ color: color, depthWrite: false });
+            var pos = [];
+            var L = roadPts.length;
+            for (var i = 0; i < L; i++) {
+                var pt = roadPts[i];
+                var tang = roadCurve.getTangent(i / (L - 1));
+                tang.normalize();
+                var perp = new THREE.Vector3(-tang.z, 0, tang.x).normalize();
+                var cx = pt.x + perp.x * offset;
+                var cz = pt.z + perp.z * offset;
+                var cy = Math.max(pt.y, terrainHeight(cx, cz)) + 0.04;
+                pos.push(cx + perp.x * width / 2, cy, cz + perp.z * width / 2);
+                pos.push(cx - perp.x * width / 2, cy, cz - perp.z * width / 2);
+            }
+            var indices = [];
+            for (var i = 0; i < L - 1; i++) {
+                var a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+                indices.push(a, c, b, b, c, d);
+            }
+            var geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            geo.setIndex(indices);
+            geo.computeVertexNormals();
+            var mesh = new THREE.Mesh(geo, mat);
+            mesh.renderOrder = 3;
+            scene.add(mesh);
+            return mesh;
+        }
+
+        makeRoadLine(0, 0.35, 0xffcc00);            // línea central continua (amarilla)
+        makeRoadLine(ROAD_W / 2, 0.3, 0xffffff);     // borde derecho (blanco)
+        makeRoadLine(-ROAD_W / 2, 0.3, 0xffffff);    // borde izquierdo (blanco)
+
+        // ===== VÍAS ADICIONALES (DESVÍOS) =====
+        // Caminos alternativos por los que el jugador puede circular (física libre).
+        // Se conectan al trazado principal en sus extremos (unión sobre la carretera).
+        // sideRoadPaths guarda los puntos de TODAS las vías secundarias para que
+        // no crezcan árboles encima y para poder comprobar colisiones de pasto.
+        var sideRoadPaths = [];
+        var sideRoadPtsPer = [];
+        var sideRoadConn = [];   // por cada desvío: { A:{idxMain}, B:{idxMain} }
+        var roadWForClear = 8;   // ancho de despeje para las vías secundarias (sin árboles)
+        function buildSideRoad(ctlPts, roadW) {
+            var curve = new THREE.CatmullRomCurve3(ctlPts, false);
+            var cnt = 280;
+            var pts = curve.getPoints(cnt);
+            // Suavizado suave (media de vecinos) para eliminar giros bruscos del trazado:
+            // reduce el ángulo local entre puntos y aplana las esquinas pequeñas.
+            var pass = 2;
+            for (var sm = 0; sm < pass; sm++) {
+                var out = [pts[0]];
+                for (var smi = 1; smi < pts.length - 1; smi++) {
+                    out.push(new THREE.Vector3(
+                        (pts[smi - 1].x + pts[smi].x + pts[smi].x + pts[smi + 1].x) / 4,
+                        0,
+                        (pts[smi - 1].z + pts[smi].x + pts[smi].x + pts[smi + 1].z) / 4
+                    ));
+                }
+                out.push(pts[pts.length - 1]);
+                pts = out;
+            }
+            // Registrar uniones con la vía principal (extremos = puntos anclados al trazado)
+            sideRoadConn.push({
+                A: { idxMain: nearestRoadIdx(ctlPts[0].x, ctlPts[0].z) },
+                B: { idxMain: nearestRoadIdx(ctlPts[ctlPts.length - 1].x, ctlPts[ctlPts.length - 1].z) }
+            });
+            sideRoadPtsPer.push(pts);
+            for (var si = 0; si < pts.length; si++) { sideRoadPaths.push(pts[si]); }
+            for (var si = 0; si < pts.length; si++) {
+                var sp = pts[si];
+                sp.y = Math.max(sp.y, terrainHeight(sp.x, sp.z)) + 0.05;
+            }
+            // Superficie de asfalto
+            var geo = new THREE.BufferGeometry();
+            var pos = [];
+            for (var si2 = 0; si2 < pts.length; si2++) {
+                var tp2 = pts[si2];
+                var tang = curve.getTangent(si2 / (cnt - 1));
+                tang.normalize();
+                var perp2 = new THREE.Vector3(-tang.z, 0, tang.x).normalize();
+                var lx = tp2.x + perp2.x * roadW / 2;
+                var lz = tp2.z + perp2.z * roadW / 2;
+                var rx = tp2.x - perp2.x * roadW / 2;
+                var rz = tp2.z - perp2.z * roadW / 2;
+                var ly = Math.max(tp2.y, terrainHeight(lx, lz)) + 0.05;
+                var ry = Math.max(tp2.y, terrainHeight(rx, rz)) + 0.05;
+                pos.push(lx, ly, lz);
+                pos.push(rx, ry, rz);
+            }
+            var idx2 = [];
+            for (var si3 = 0; si3 < pts.length - 1; si3++) {
+                var a = si3 * 2, bb = si3 * 2 + 1, c = (si3 + 1) * 2, d = (si3 + 1) * 2 + 1;
+                idx2.push(a, c, bb, bb, c, d);
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            geo.setIndex(idx2);
+            geo.computeVertexNormals();
+            // Asfalto más claro/brillante para que las vías secundarias se vean bien contra el pasto
+            var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x56595f, roughness: 0.75, emissive: 0x1c1c22, emissiveIntensity: 0.35 }));
+            m.receiveShadow = true;
+            scene.add(m);
+            // Línea central discontinua (amarilla) para resaltar la vía como circulable
+            (function () {
+                var cl = [];
+                var stepDash = Math.max(1, Math.round(cnt / 60));
+                for (var di = 0; di < pts.length; di += stepDash) {
+                    var dttp = pts[di];
+                    var dtgg = curve.getTangent(di / (cnt - 1));
+                    dtgg.normalize();
+                    var dpp = new THREE.Vector3(-dtgg.z, 0, dtgg.x).normalize();
+                    var dxx = dttp.x, dzz = dttp.z;
+                    var dyy = Math.max(dttp.y, terrainHeight(dxx, dzz)) + 0.075;
+                    var dl = dpp.length() * 0.12;
+                    cl.push(dxx + dpp.x * dl, dyy, dzz + dpp.z * dl);
+                    cl.push(dxx - dpp.x * dl, dyy, dzz - dpp.z * dl);
+                }
+                if (cl.length >= 6) {
+                    var cli = [];
+                    for (var sk = 0; sk + 2 < cl.length; sk += 6) {
+                        var a = sk / 3, b = a + 1;
+                        cli.push(a, a + 1, b, b, a + 1, b + 1);
+                    }
+                    var cgeo = new THREE.BufferGeometry();
+                    cgeo.setAttribute('position', new THREE.Float32BufferAttribute(cl, 3));
+                    cgeo.setIndex(cli);
+                    cgeo.computeVertexNormals();
+                    var cm = new THREE.Mesh(cgeo, new THREE.MeshBasicMaterial({ color: 0xffcc00, depthWrite: false }));
+                    cm.renderOrder = 3;
+                    scene.add(cm);
+                }
+            })();
+            // Bordes blancos
+            function sideLine(off, w) {
+                var lp = [];
+                for (var si4 = 0; si4 < pts.length; si4++) {
+                    var tp3 = pts[si4];
+                    var tg3 = curve.getTangent(si4 / (cnt - 1));
+                    tg3.normalize();
+                    var pp3 = new THREE.Vector3(-tg3.z, 0, tg3.x).normalize();
+                    var cx = tp3.x + pp3.x * off;
+                    var cz = tp3.z + pp3.z * off;
+                    var cy = Math.max(tp3.y, terrainHeight(cx, cz)) + 0.06;
+                    lp.push(cx + pp3.x * w / 2, cy, cz + pp3.z * w / 2);
+                    lp.push(cx - pp3.x * w / 2, cy, cz - pp3.z * w / 2);
+                }
+                var li2 = [];
+                for (var si5 = 0; si5 < pts.length - 1; si5++) {
+                    var a2 = si5 * 2, b2 = a2 + 1, c2 = a2 + 2, d2 = a2 + 3;
+                    li2.push(a2, c2, b2, b2, c2, d2);
+                }
+                var g2 = new THREE.BufferGeometry();
+                g2.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
+                g2.setIndex(li2);
+                g2.computeVertexNormals();
+                var mm = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false }));
+                mm.renderOrder = 3;
+                scene.add(mm);
+            }
+            sideLine(roadW / 2, 0.3);
+            sideLine(-roadW / 2, 0.3);
+        }
+
+        // Punto sobre el trazado principal lo más cercano a unas coordenadas
+        function snapToMain(x, z) {
+            var idx = nearestRoadIdx(x, z);
+            return roadPts[idx];
+        }
+
+        // Desvío 1 — ruta interior larga de AVANCE (sur→este): conecta el suroeste con el
+        // este con curvas amplias y suaves que progresan de forma continua.
+        var d1A = snapToMain(-650, -700);
+        var d1B = snapToMain(620, -380);
+        buildSideRoad([
+            new THREE.Vector3(d1A.x, 0, d1A.z),
+            new THREE.Vector3(-690, 0, -560),
+            new THREE.Vector3(-700, 0, -420),
+            new THREE.Vector3(-580, 0, -300),
+            new THREE.Vector3(-380, 0, -240),
+            new THREE.Vector3(-180, 0, -300),
+            new THREE.Vector3(-40, 0, -400),
+            new THREE.Vector3(120, 0, -440),
+            new THREE.Vector3(280, 0, -400),
+            new THREE.Vector3(420, 0, -340),
+            new THREE.Vector3(540, 0, -320),
+            new THREE.Vector3(d1B.x, 0, d1B.z)
+        ], 8);
+
+        // Desvío 2 — carretera norte de AVANCE (noreste→oeste), sinuosa pero siempre
+        // progresando hacia el oeste con curvas largas.
+        var d2A = snapToMain(-560, 740);
+        var d2B = snapToMain(-900, 280);
+        buildSideRoad([
+            new THREE.Vector3(d2A.x, 0, d2A.z),
+            new THREE.Vector3(-480, 0, 700),
+            new THREE.Vector3(-380, 0, 620),
+            new THREE.Vector3(-360, 0, 500),
+            new THREE.Vector3(-460, 0, 420),
+            new THREE.Vector3(-590, 0, 410),
+            new THREE.Vector3(-640, 0, 300),
+            new THREE.Vector3(-570, 0, 190),
+            new THREE.Vector3(-440, 0, 150),
+            new THREE.Vector3(-400, 0, 40),
+            new THREE.Vector3(-500, 0, -40),
+            new THREE.Vector3(-640, 0, -30),
+            new THREE.Vector3(-780, 0, 40),
+            new THREE.Vector3(-880, 0, 150),
+            new THREE.Vector3(d2B.x, 0, d2B.z)
+        ], 8);
+
+        // Desvío 3 — lazo noreste de AVANCE: sale por el este y hace una vuelta amplia
+        // continua (siempre en la misma dirección) hacia la esquina noreste anticipando
+        // curvas largas, sin invertir el rumbo.
+        var d3A = snapToMain(740, -200);
+        var d3B = snapToMain(820, 0);
+        buildSideRoad([
+            new THREE.Vector3(d3A.x, 0, d3A.z),
+            new THREE.Vector3(800, 0, -150),
+            new THREE.Vector3(920, 0, -60),
+            new THREE.Vector3(960, 0, 50),
+            new THREE.Vector3(900, 0, 130),
+            new THREE.Vector3(800, 0, 140),
+            new THREE.Vector3(720, 0, 60),
+            new THREE.Vector3(740, 0, -30),
+            new THREE.Vector3(d3B.x, 0, d3B.z)
+        ], 8);
+
+        // Desvío 4 — circuito noroeste de AVANCE (norte continuo): conecta el oeste con
+        // el norte girando en arco amplio que nunca retrocede sobre sí mismo.
+        var d4A = snapToMain(-760, 160);
+        var d4B = snapToMain(-720, 640);
+        buildSideRoad([
+            new THREE.Vector3(d4A.x, 0, d4A.z),
+            new THREE.Vector3(-740, 0, 260),
+            new THREE.Vector3(-760, 0, 360),
+            new THREE.Vector3(-820, 0, 440),
+            new THREE.Vector3(-900, 0, 460),
+            new THREE.Vector3(-940, 0, 400),
+            new THREE.Vector3(-920, 0, 330),
+            new THREE.Vector3(-840, 0, 300),
+            new THREE.Vector3(-760, 0, 340),
+            new THREE.Vector3(-740, 0, 420),
+            new THREE.Vector3(-760, 0, 500),
+            new THREE.Vector3(-800, 0, 570),
+            new THREE.Vector3(-760, 0, 620),
+            new THREE.Vector3(d4B.x, 0, d4B.z)
+        ], 8);
+
+        // Desvío 5 — carretera sureste de AVANCE (sur→sur avanzo por el este) con curvas
+        // largas y fluidas que nunca requieren dar la vuelta.
+        var d5A = snapToMain(200, -790);
+        var d5B = snapToMain(500, -540);
+        buildSideRoad([
+            new THREE.Vector3(d5A.x, 0, d5A.z),
+            new THREE.Vector3(300, 0, -760),
+            new THREE.Vector3(400, 0, -720),
+            new THREE.Vector3(490, 0, -680),
+            new THREE.Vector3(560, 0, -620),
+            new THREE.Vector3(570, 0, -550),
+            new THREE.Vector3(d5B.x, 0, d5B.z)
+        ], 8);
+
+        // ===== RED DE CARRETERAS (grafo de junciones) =====
+        // Permite a los bots del policía circular por la vía principal Y entrar a los
+        // desvíos para perseguirte hasta donde estés, tomando la ruta más corta por asfalto.
+        var SAB = 8.6;                       // ancho de la vía principal/desvíos (para unión)
+        var segMain = { type: 'main', id: -1, pts: roadPts };   // la vía principal
+        var segments = [segMain];            // segmento 0 = vía principal, 1.. = desvíos
+        for (var segi = 0; segi < sideRoadPtsPer.length; segi++) {
+            segments.push({ type: 'side', id: segi, pts: sideRoadPtsPer[segi] });
+        }
+
+        // ---- Junciones (puntos donde un desvío toca el trazado principal) ----
+        // Junción = un índice concreto de la vía principal al que llegan 1 o más desvíos.
+        var junctions = [];                  // { idxMain, sideA:[desvío], sideB:[desvío] }
+        var junKey = {};
+        function addJunction(idxMain, sideId, which) {
+            var k = String(idxMain);
+            if (!junKey[k]) {
+                junKey[k] = { idxMain: idxMain, sideA: [], sideB: [] };
+                junctions.push(junKey[k]);
+            }
+            if (which === 'A') junKey[k].sideA.push(sideId);
+            else junKey[k].sideB.push(sideId);
+        }
+        for (var sj = 0; sj < sideRoadConn.length; sj++) {
+            addJunction(sideRoadConn[sj].A.idxMain, sj, 'A');
+            addJunction(sideRoadConn[sj].B.idxMain, sj, 'B');
+        }
+        junctions.sort(function (a, b) { return a.idxMain - b.idxMain; });
+        var J = junctions.length;
+
+        // Longitud (en unidades del mundo) entre dos índices de un array de puntos
+        function segDist(pts, i0, i1) {
+            var lo = Math.min(i0, i1), hi = Math.max(i0, i1), sum = 0;
+            for (var k = lo; k < hi; k++) sum += dist2d(pts[k], pts[k + 1]);
+            return sum;
+        }
+        function dist2d(a, b) { var dx = a.x - b.x, dz = a.z - b.z; return Math.sqrt(dx * dx + dz * dz); }
+        // Longitud acumulada de la vía principal desde el índice 0 hasta i (índice entero, [0,n])
+        var MAIN_CUM = null;
+        function mainCum() {
+            if (MAIN_CUM) return MAIN_CUM;
+            var n = roadPts.length, c = [0];
+            for (var k = 1; k <= n; k++) c[k] = c[k - 1] + dist2d(roadPts[k - 1], roadPts[k % n]);
+            MAIN_CUM = c;
+            return c;
+        }
+        function mainArcLen(i0, i1) {
+            // Distancia de viaje en sentido +1 por la vía principal desde i0 hasta i1
+            // (siempe avanzando en índice, cruzando el 0 si hace falta).
+            var c = mainCum(), n = roadPts.length;
+            var a = ((i0 % n) + n) % n, b = ((i1 % n) + n) % n;
+            if (a === b) return c[n];   // vuelta completa
+            if (b >= a) return c[b] - c[a];
+            return (c[n] - c[a]) + c[b];
+        }
+
+        // ---- Grafo de adyacencia entre junciones ----
+        // Nodos = junciones. Aristas = arcos de vía principal entre junciones consecutivas
+        // (en sentido +1) y cada desvío une sus 2 junciones. Edges bidireccionales.
+        var roadGraph = [];
+        for (var ji = 0; ji < J; ji++) roadGraph.push([]);
+        function edgeJ(a, b, w, kind, side) {
+            roadGraph[a].push({ to: b, w: w, kind: kind || 'main', side: side !== undefined ? side : -1 });
+            roadGraph[b].push({ to: a, w: w, kind: kind || 'main', side: side !== undefined ? side : -1 });
+        }
+        for (var ej = 0; ej < J; ej++) {
+            var nxt = (ej + 1) % J;
+            edgeJ(ej, nxt, mainArcLen(junctions[ej].idxMain, junctions[nxt].idxMain), 'main');
+        }
+        for (var sr = 0; sr < sideRoadConn.length; sr++) {
+            var jA = junKey[String(sideRoadConn[sr].A.idxMain)], jB = junKey[String(sideRoadConn[sr].B.idxMain)];
+            var ia = junctions.indexOf(jA), ib = junctions.indexOf(jB);
+            var wS = segDist(sideRoadPtsPer[sr], 0, sideRoadPtsPer[sr].length - 1);
+            edgeJ(ia, ib, wS, 'side', sr);
+        }
+
+        // ---- Localización de un punto en la red de carreteras ----
+        // Devuelve { segIdx (índice en 'segments'), idx (índice ENTERO en pts) }
+        // Elige el desvío si está claramente más cerca y dentro del margen de asfalto.
+        function locateOnRoad(x, z) {
+            var bestMain = Infinity, mn = 0, n = roadPts.length;
+            for (var q = 0; q < n; q++) {
+                var d = (roadPts[q].x - x) * (roadPts[q].x - x) + (roadPts[q].z - z) * (roadPts[q].z - z);
+                if (d < bestMain) { bestMain = d; mn = q; }
+            }
+            var bestSide = Infinity, bsId = -1, nSeg = segments.length;
+            for (var rr = 1; rr < nSeg; rr++) {
+                var p = segments[rr].pts, m = p.length;
+                for (var q2 = 0; q2 < m; q2++) {
+                    var d2 = (p[q2].x - x) * (p[q2].x - x) + (p[q2].z - z) * (p[q2].z - z);
+                    if (d2 < bestSide) { bestSide = d2; bsId = rr; }
+                }
+            }
+            var margin = SAB / 2 + 5;
+            var useSide = bsId >= 0 && bestSide < bestMain && bestSide <= margin * margin;
+            var segIdx = useSide ? bsId : 0;
+            return { seg: segIdx, segIdx: segIdx, idx: useSide ? nearestSideIdx(bsId, x, z) : nearestRoadIdx(x, z) };
+        }
+        function nearestSideIdx(sid, x, z) {
+            var p = segments[sid].pts, m = p.length, bestI = 0, bestD = Infinity;
+            for (var i = 0; i < m; i++) {
+                var d = (p[i].x - x) * (p[i].x - x) + (p[i].z - z) * (p[i].z - z);
+                if (d < bestD) { bestD = d; bestI = i; }
+            }
+            return bestI;
+        }
+
+        // Distancia en unidades desde una posición (segIdx, idx ENTERA) hasta el extremo de
+        // su junción. endMainIdx = índice de vía principal de esa junción.
+        function distToMainJunc(segIdx, idx, endMainIdx) {
+            var s = segments[segIdx];
+            if (segIdx === 0) {
+                // vía principal: distancia a lo largo del circuito entre idx y la junción
+                return mainArcLen(idx, endMainIdx);
+            }
+            // desvío: extensión en línea recta por el punto de unión, pero para el grafo la
+            // distancia real es la del desvío desde idx hasta su extremo. endMainIdx es el
+            // índice de vía principal del extremo; la junción "es" ese punto.
+            return segDist(s.pts, idx, sideRoadConn[segIdx - 1].A.idxMain === endMainIdx ? 0 : s.pts.length - 1);
+        }
+
+        // ---- Utilidades de enrutamiento para los bots ----
+
+        // Anclas (junciones) a las que está conectado un punto de la red, con el coste
+        // en unidades desde el punto hasta esa junción.
+        // loc = { seg, idx }  (idx índice ENTERO/float en segments[loc.seg])
+        function anchorsOf(loc) {
+            if (loc.seg === 0) {
+                // vía principal: las 2 junciones que encierran a idx
+                var jPrev = -1, jNext = -1, f = Math.floor(loc.idx);
+                for (var t = 0; t < J; t++) {
+                    if (junctions[t].idxMain <= f) jPrev = t;
+                    if (junctions[t].idxMain > f && jNext < 0) jNext = t;
+                }
+                if (jNext < 0) jNext = 0;
+                if (jPrev < 0) jPrev = J - 1;
+                return [ { node: jPrev, cost: mainArcLen(junctions[jPrev].idxMain, f) },
+                         { node: jNext, cost: mainArcLen(f, junctions[jNext].idxMain) } ];
+            }
+            // desvío: sus 2 junciones A y B
+            var conn = sideRoadConn[loc.seg - 1];
+            var s = segments[loc.seg].pts, m = s.length - 1;
+            var jA = junctions.indexOf(junKey[String(conn.A.idxMain)]);
+            var jB = junctions.indexOf(junKey[String(conn.B.idxMain)]);
+            return [ { node: jA, cost: segDist(s, loc.idx, 0) },
+                     { node: jB, cost: segDist(s, loc.idx, m) } ];
+        }
+
+        // Dijkstra desde múltiples orígenes [{node, w}]; devuelve dist[] sobre J nodos.
+        function dijkstraFrom(srcs) {
+            var dist = [], done = [];
+            for (var i = 0; i < J; i++) { dist[i] = Infinity; done[i] = false; }
+            for (var s = 0; s < srcs.length; s++) {
+                var o = srcs[s];
+                if (o.w < dist[o.node]) dist[o.node] = o.w;
+            }
+            while (true) {
+                var u = -1, bD = Infinity;
+                for (var i = 0; i < J; i++) if (!done[i] && dist[i] < bD) { bD = dist[i]; u = i; }
+                if (u < 0) break; done[u] = true;
+                for (var e = 0; e < roadGraph[u].length; e++) {
+                    var ed = roadGraph[u][e], nd = dist[u] + ed.w;
+                    if (nd < dist[ed.to]) dist[ed.to] = nd;
+                }
+            }
+            return dist;
+        }
+
+        // Índice (ENTERO) del punto de un segmento donde entra una junción.
+        function junctionEntryIdx(segIdx, jNode) {
+            if (segIdx === 0) return junctions[jNode].idxMain;
+            var conn = sideRoadConn[segIdx - 1];
+            return (junctions.indexOf(junKey[String(conn.A.idxMain)]) === jNode) ? 0 : segments[segIdx].pts.length - 1;
+        }
+
+        // Sentido (+1/+1) más corto para recorrer el circuito principal entre dos índices.
+        // 'fwd' = avanzar en índice creciente (cruzando 0 si hace falta); elige el menor.
+        function mainDirBetween(ia, ib) {
+            var fwd = mainArcLen(ia, ib);
+            var bwd = mainArcLen(ib, ia);
+            return fwd <= bwd ? 1 : -1;
+        }
+
+        // Plan de ruta del BOT (locB) al JUGADOR (locP) como lista de tramos:
+        // [{ seg, entry, exit, dir }] donde dir = +1/-1 sentido de recorrido y entry/exit
+        // son índices float en segments[seg]. El último tramo termina en locP.idx.
+        function planRoute(locB, locP) {
+            // Convierte un índice de vía principal a su NODO de junción (o -1 si ninguno).
+            function jNodeOfIdx(mainIdx) {
+                for (var jn = 0; jn < junctions.length; jn++) if (junctions[jn].idxMain === mainIdx) return jn;
+                return -1;
+            }
+            // Índice dentro del segmento del bot donde éste se conecta a la junción-nodo nn.
+            function segEntryFor(segIdx, nn) {
+                if (segIdx === 0) return junctions[nn].idxMain;
+                var cc = sideRoadConn[segIdx - 1];
+                return (jNodeOfIdx(cc.A.idxMain) === nn) ? 0 : segments[segIdx].pts.length - 1;
+            }
+
+            var hops = [];
+            var aB = anchorsOf(locB);
+
+            if (locP.seg > 0) {
+                // El jugador está en un DESVÍO: forzar que la ruta atraviese ESE desvío,
+                // entrando por una de sus dos junciones y siguiéndolo hasta el jugador
+                // (en vez de rodear por la vía principal hasta la junción lejana).
+                var cc = sideRoadConn[locP.seg - 1];
+                var candN = [jNodeOfIdx(cc.A.idxMain), jNodeOfIdx(cc.B.idxMain)];
+                // Elegir la junción del desvío MÁS CERCANA al bot (menor coste de llegada por
+                // la red); en cualquier caso el bot atraviesa el desvío entero hasta el jugador.
+                var bestEnd = -1, bestExitIdx = -1, bestCost = Infinity;
+                for (var i = 0; i < aB.length; i++) {
+                    var dArr = dijkstraFrom([{ node: aB[i].node, w: 0 }]);
+                    for (var cn = 0; cn < candN.length; cn++) {
+                        if (candN[cn] < 0) continue;
+                        var arrival = (candN[cn] === aB[i].node) ? aB[i].cost : dArr[candN[cn]] + aB[i].cost;
+                        if (!isFinite(arrival)) continue;
+                        if (arrival < bestCost) {
+                            bestCost = arrival; bestEnd = candN[cn]; bestExitIdx = i;
+                        }
+                    }
+                }
+                if (bestEnd < 0 || !isFinite(bestCost)) return null;
+                var startNode = aB[bestExitIdx].node;
+                var endNode = bestEnd;
+                // camino de junciones por la vía principal startNode→endNode
+                var pnodesN = (startNode === endNode) ? [startNode] : dijkstraPath(startNode, endNode);
+                if (!pnodesN) return null;
+                // tramo dentro del segmento actual del bot hasta su junción de salida
+                hops.push({ seg: locB.seg, entry: locB.idx, exit: segEntryFor(locB.seg, startNode), dir: (locB.seg === 0) ? mainDirBetween(locB.idx, segEntryFor(0, startNode)) : (segEntryFor(locB.seg, startNode) >= locB.idx ? 1 : -1) });
+                // tramos entre junciones de la vía principal
+                for (var h = 0; h + 1 < pnodesN.length; h++) {
+                    var hopM = hopBetweenJunctions(pnodesN[h], pnodesN[h + 1]);
+                    if (!hopM) return null;
+                    hops.push(hopM);
+                }
+                // final: entrar al desvío en endNode y seguirlo hasta el jugador
+                var entrF = segEntryFor(locP.seg, endNode);
+                hops.push({ seg: locP.seg, entry: entrF, exit: locP.idx, dir: locP.idx >= entrF ? 1 : -1 });
+                return hops;
+            }
+
+            // --- Caso general: jugador en la vía principal ---
+            var aP = anchorsOf(locP);
+            var bestA = -1, bestTopNode = -1, bestCost = Infinity;
+            for (var i = 0; i < aB.length; i++) {
+                var dArr = dijkstraFrom([{ node: aB[i].node, w: 0 }]);
+                var topP = Infinity, topN = -1;
+                for (var t = 0; t < aP.length; t++) {
+                    var c = dArr[aP[t].node] + aP[t].cost;
+                    if (c < topP) { topP = c; topN = aP[t].node; }
+                }
+                var total = aB[i].cost + topP;
+                if (total < bestCost) { bestCost = total; bestA = i; bestTopNode = topN; }
+            }
+            if (!isFinite(bestCost)) return null;
+            var startNode = aB[bestA].node;
+            var endNode = bestTopNode;
+            var pnodes = dijkstraPath(startNode, endNode);
+            if (!pnodes) return null;
+            var exitIdx0 = segEntryFor(locB.seg, startNode);
+            hops.push({ seg: locB.seg, entry: locB.idx, exit: exitIdx0, dir: (locB.seg === 0) ? mainDirBetween(locB.idx, exitIdx0) : (exitIdx0 >= locB.idx ? 1 : -1) });
+            for (var h = 0; h + 1 < pnodes.length; h++) {
+                var hop = hopBetweenJunctions(pnodes[h], pnodes[h + 1]);
+                if (!hop) return null;
+                hops.push(hop);
+            }
+            var lastSegIdx = segmentOfJunction(endNode, locP);
+            if (lastSegIdx === null) return null;
+            var entryL = segEntryFor(lastSegIdx, endNode);
+            hops.push({ seg: lastSegIdx, entry: entryL, exit: locP.idx, dir: (lastSegIdx === 0) ? mainDirBetween(entryL, locP.idx) : (locP.idx >= entryL ? 1 : -1) });
+            return hops;
+        }
+
+        // Dijkstra con reconstrucción de camino hacia un destino (usa roadGraph).
+        function dijkstraPath(src, dst) {
+            var dist = [], prev = [], done = [];
+            for (var i = 0; i < J; i++) { dist[i] = Infinity; prev[i] = -1; done[i] = false; }
+            dist[src] = 0;
+            while (true) {
+                var u = -1, bD = Infinity;
+                for (var i = 0; i < J; i++) if (!done[i] && dist[i] < bD) { bD = dist[i]; u = i; }
+                if (u < 0) break; done[u] = true;
+                for (var e = 0; e < roadGraph[u].length; e++) {
+                    var ed = roadGraph[u][e], nd = dist[u] + ed.w;
+                    if (nd < dist[ed.to]) { dist[ed.to] = nd; prev[ed.to] = u; }
+                }
+            }
+            if (!isFinite(dist[dst])) return null;
+            var path = [], cur = dst;
+            while (cur >= 0) { path.push(cur); cur = prev[cur]; }
+            path.reverse();
+            return path;
+        }
+
+        // Tramo (junction->junction) correspondiente al segmento que conecta fromN y toN.
+        function hopBetweenJunctions(fromN, toN) {
+            // buscar la arista en roadGraph[fromN] hacia toN
+            var edge = null;
+            for (var e = 0; e < roadGraph[fromN].length; e++) {
+                if (roadGraph[fromN][e].to === toN) { edge = roadGraph[fromN][e]; break; }
+            }
+            if (!edge) return null;
+            if (edge.kind === 'main') {
+                // vía principal entre esas 2 junciones (dirección = arco más corto)
+                var eMain = junctionEntryIdx(0, fromN);
+                var xMain = junctionEntryIdx(0, toN);
+                return { seg: 0, entry: eMain, exit: xMain, dir: mainDirBetween(eMain, xMain) };
+            }
+            // desvío 'side': entrada en el extremo correspondiente
+            var sr = edge.side;
+            var jA = junctions.indexOf(junKey[String(sideRoadConn[sr].A.idxMain)]);
+            var m = sideRoadPtsPer[sr].length - 1;
+            if (fromN === jA) return { seg: sr + 1, entry: 0, exit: m, dir: 1 };
+            return { seg: sr + 1, entry: m, exit: 0, dir: -1 };
+        }
+
+        // Segmento que contiene a la junción endNode y también contiene (está conectado a)
+        // la posición del jugador locP; devuelve el índice del segmento donde terminar.
+        function segmentOfJunction(endNode, locP) {
+            // Si el jugador está en un desvío que toca endNode, o en la vía principal.
+            // Devolvemos el segmento del jugador si es que endNode es una de sus anclas.
+            var aP = anchorsOf(locP);
+            for (var k = 0; k < aP.length; k++) if (aP[k].node === endNode) return locP.seg;
+            // si no, no debería ocurrir; devolver el segmento del jugador igualmente
+            return locP.seg;
+        }
+
+        // Señales de curva: medir el giro acumulado sobre una ventana de la vía
+        var L = roadPts.length;
+        var WINDOW = 40; // en muestras (~40/800 del recorrido antes del giro)
+        var curvesPts = [];
+        for (var ci = 0; ci < L; ci++) {
+            // Tangente en el punto actual y en un punto adelante (misma dirección de marcha)
+            var t0 = roadCurve.getTangent(ci / (L - 1));
+            var t1 = roadCurve.getTangent(((ci + 10) / (L - 1)) % 1);
+            t0.normalize(); t1.normalize();
+            var ang = Math.acos(THREE.MathUtils.clamp(t0.dot(t1), -1, 1));
+            if (ang > 0.22) {
+                // Dirección del giro: producto cruz (componente Y) > 0 = derecha, < 0 = izquierda
+                var cross = t0.x * t1.z - t0.z * t1.x;
+                var dir = cross > 0 ? 1 : -1; // 1 = derecha, -1 = izquierda
+                curvesPts.push({ idx: ci, ang: ang, dir: dir, pt: roadPts[ci] });
+            }
+        }
+        // Eliminar giros muy cercanos entre sí (dejar solo el pico de cada curva)
+        var signPts = [];
+        for (var k = 0; k < curvesPts.length; k++) {
+            var c = curvesPts[k];
+            var isolated = true;
+            for (var k2 = 0; k2 < signPts.length; k2++) {
+                var ddx = c.pt.x - signPts[k2].x;
+                var ddz = c.pt.z - signPts[k2].z;
+                if (Math.sqrt(ddx * ddx + ddz * ddz) < 50) { isolated = false; break; }
+            }
+            if (isolated) signPts.push({ x: c.pt.x, z: c.pt.z, idx: c.idx, ang: c.ang, dir: c.dir });
+        }
+
+        // Materiales de señales
+        var postMat = new THREE.MeshStandardMaterial({ color: 0x9a9a9a });
+        var signFrameMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        var signYellMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
+        var signArrowMat = new THREE.MeshStandardMaterial({ color: 0x111111, side: THREE.DoubleSide });
+
+        // Crea la flecha curva de dirección en un plano local XY (apuntando a la derecha)
+        // La flecha va desde la base izquierda, sube en arco y termina con punta hacia la derecha.
+        function curveArrowGeometry() {
+            var shape = new THREE.Shape();
+            var s = 1;
+            // Trazo de la flecha curva
+            shape.moveTo(-0.6, -0.45);
+            shape.quadraticCurveTo(0.4, -0.45, 0.55, 0.1);
+            // Puntero (triángulo) en el extremo superior derecho
+            shape.lineTo(0.75, 0.02);
+            shape.lineTo(0.68, 0.28);
+            shape.lineTo(0.42, 0.2);
+            shape.lineTo(0.4, 0.18);
+            shape.quadraticCurveTo(0.22, -0.25, -0.6, -0.25);
+            shape.closePath();
+            return new THREE.ShapeGeometry(shape);
+        }
+
+        function placeCurveSign(x, z, yawDeg, dir) {
+            var gy = terrainHeight(x, z) + 0.3;
+            var post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 2.8, 8), postMat);
+            post.position.set(x, gy + 1.4, z);
+            post.castShadow = true;
+            scene.add(post);
+            // Panel en forma de diamante (señal de peligro) amarillo con borde negro
+            var diamond = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.9, 0.12), signYellMat);
+            diamond.position.set(x, gy + 3.1, z);
+            diamond.rotation.y = yawDeg;
+            diamond.castShadow = true;
+            scene.add(diamond);
+            // Borde (marco) negro ligeramente más grande detrás
+            var border = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.1, 0.1), signFrameMat);
+            border.position.set(x, gy + 3.1, z);
+            border.rotation.y = yawDeg;
+            scene.add(border);
+            // Flecha de curva (refleja si el giro es a la izquierda)
+            var arrow = new THREE.Mesh(curveArrowGeometry(), signArrowMat);
+            arrow.position.set(x, gy + 3.1, z);
+            arrow.rotation.y = yawDeg;
+            arrow.rotation.z = dir < 0 ? Math.PI : 0; // voltear horizontalmente si es izquierda
+            scene.add(arrow);
+        }
+
+        for (var s = 0; s < signPts.length; s++) {
+            var sign = signPts[s];
+            var idxF = Math.max(0, Math.min(L - 1, sign.idx - 25)); // punto ~antes del giro
+            var pt = roadPts[idxF];
+            var tang = roadCurve.getTangent(idxF / (L - 1));
+            tang.normalize();
+            var perp = new THREE.Vector3(-tang.z, 0, tang.x).normalize();
+            var offset = 5.5;
+            var sx = pt.x + perp.x * offset;
+            var sz = pt.z + perp.z * offset;
+            // Rotar el panel para que mire hacia la carretera (opuesto a perp)
+            var yaw = -Math.atan2(perp.x, perp.z);
+            placeCurveSign(sx, sz, yaw, sign.dir);
+        }
+
+        // Barreras de madera destructibles en los giros cerrados
+        var barrierSegments = [];   // { a:{x,z}, b:{x,z}, meshes:[...], destroyed:false }
+        var barrierMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 });
+        var barrierDark = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.9 });
+        var SPAN = 4;               // longitud aproximada de cada segmento de barrera
+
+        // Genera una barrera en el borde exterior de un tramo curvo, como tramos rectos y alineados
+        function buildBarrierAt(sign, spanHi) {
+            var start = Math.max(0, sign.idx - spanHi);
+            var end = Math.min(L - 1, sign.idx + spanHi);
+            var side = -sign.dir; // lado exterior de la curva
+            var off = ROAD_W / 2 + 1.2;
+
+            // Colectar puntos del borde exterior del tramo
+            var edgePts = [];
+            var step = 3; // muestrear cada N puntos de la vía
+            for (var bi = start; bi <= end; bi += step) {
+                var hp = roadPts[bi];
+                var tang = roadCurve.getTangent(bi / (L - 1));
+                tang.normalize();
+                var perp = new THREE.Vector3(-tang.z, 0, tang.x).normalize();
+                edgePts.push({
+                    x: hp.x + perp.x * side * off,
+                    z: hp.z + perp.z * side * off,
+                    y: terrainHeight(hp.x + perp.x * side * off, hp.z + perp.z * side * off)
+                });
+            }
+            if (edgePts.length < 2) return;
+
+            // Crear tramos rectos entre puntos consecutivos del borde (sin conectar para no torcer)
+            var segs = [];
+            for (var e = 0; e < edgePts.length - 1; e++) {
+                var A = edgePts[e];
+                var B = edgePts[e + 1];
+                var dx = B.x - A.x;
+                var dz = B.z - A.z;
+                var dlen = Math.sqrt(dx * dx + dz * dz);
+                if (dlen < 0.4) continue;
+                var mx = (A.x + B.x) / 2;
+                var mz = (A.z + B.z) / 2;
+                var gy = 0.3;
+
+                // No dejar que la barrera atraviese una vía secundaria (desvío): si este
+                // tramo cae sobre/cerca de algún desvío, se omite para no cruzar la carretera.
+                var nearSide = false;
+                for (var sr = 0; sr < sideRoadPtsPer.length && !nearSide; sr++) {
+                    var spth = sideRoadPtsPer[sr];
+                    for (var ss0 = 0; ss0 < spth.length && !nearSide; ss0++) {
+                        var ddx = spth[ss0].x - mx, ddz = spth[ss0].z - mz;
+                        if (ddx * ddx + ddz * ddz <= 7.5 * 7.5) nearSide = true;
+                    }
+                }
+                if (nearSide) continue;
+
+                // Alinear el eje largo (X) de la tabla con la dirección del tramo (dx,dz)
+                var yaw = Math.atan2(-dz, dx);
+
+                var gA = { x: A.x, z: A.z };
+                var gB = { x: B.x, z: B.z };
+                var seg = { a: gA, b: gB, meshes: [], destroyed: false };
+
+                // Una sola tabla recta por tramo (alineada con la dirección del borde)
+                var plank = new THREE.Mesh(new THREE.BoxGeometry(dlen + 0.5, 0.55, 0.16), barrierMat);
+                plank.position.set(mx, gy + 1.0, mz);
+                plank.rotation.y = yaw;
+                plank.castShadow = true;
+                scene.add(plank);
+                seg.meshes.push(plank);
+
+                // Poste en cada extremo
+                for (var p = 0; p < 2; p++) {
+                    var pX = p === 0 ? A.x : B.x;
+                    var pZ = p === 0 ? A.z : B.z;
+                    var post = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.3, 6), barrierDark);
+                    post.position.set(pX, gy + 0.65, pZ);
+                    post.castShadow = true;
+                    scene.add(post);
+                    seg.meshes.push(post);
+                }
+                segs.push(seg);
+            }
+            barrierSegments = barrierSegments.concat(segs);
+        }
+
+        // Colocar barreras en cada giro detectado
+        for (var bgi = 0; bgi < signPts.length; bgi++) {
+            buildBarrierAt(signPts[bgi], 16);
+        }
+
+        // Sistema de partículas (astillas de madera al destruir una barrera)
+        var woodParticles = [];
+        var chipMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 });
+        var chipGeo = new THREE.BoxGeometry(0.14, 0.1, 0.06);
+
+        function spawnChips(x, z, y, count) {
+            for (var c = 0; c < count; c++) {
+                var p = new THREE.Mesh(chipGeo, chipMat);
+                p.position.set(x, y, z);
+                p.castShadow = true;
+                p.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 7,
+                    2.5 + Math.random() * 3.5,
+                    (Math.random() - 0.5) * 7
+                );
+                p.angular = new THREE.Vector3(
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10
+                );
+                p.life = 1.4 + Math.random() * 0.8;
+                p.age = 0;
+                scene.add(p);
+                woodParticles.push(p);
+            }
+        }
+
+        // Destruye una barrera (la desarma, elimina y suelta astillas)
+        function destroyBarrier(seg) {
+            if (seg.destroyed) return;
+            seg.destroyed = true;
+            var last = seg.meshes[seg.meshes.length - 1];
+            for (var mm = 0; mm < seg.meshes.length; mm++) {
+                var m = seg.meshes[mm];
+                if (m === last && m.position) {
+                    spawnChips(m.position.x, m.position.z, m.position.y, 8);
+                }
+                scene.remove(m);
+                if (m.geometry) m.geometry.dispose();
+            }
+            seg.meshes = [];
+        }
+
+        // Actualiza y elimina las partículas (se llama cada frame)
+        function updateParticles(dt) {
+            for (var pi = woodParticles.length - 1; pi >= 0; pi--) {
+                var p = woodParticles[pi];
+                p.age += dt;
+                if (p.age >= p.life) {
+                    scene.remove(p);
+                    if (p.geometry) p.geometry.dispose();
+                    woodParticles.splice(pi, 1);
+                    continue;
+                }
+                // Gravedad
+                p.velocity.y -= 16 * dt;
+                // Rebote simple contra el suelo
+                var gy = terrainHeight(p.position.x, p.position.z) + 0.1;
+                p.position.x += p.velocity.x * dt;
+                p.position.y += p.velocity.y * dt;
+                p.position.z += p.velocity.z * dt;
+                if (p.position.y < gy) {
+                    p.position.y = gy;
+                    p.velocity.y = Math.abs(p.velocity.y) * 0.35;
+                    p.velocity.x *= 0.8;
+                    p.velocity.z *= 0.8;
+                }
+                p.rotation.x += p.angular.x * dt;
+                p.rotation.y += p.angular.y * dt;
+                p.rotation.z += p.angular.z * dt;
+            }
+        }
+
+        // Árboles tipo bosque
+        var treeColliders = [];
+        var trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4226 });
+        var leafMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32 });
+        var leafMat2 = new THREE.MeshStandardMaterial({ color: 0x388e3c });
+        var nearCurve = new THREE.Vector3();
+        var _tmpPt = new THREE.Vector3();
+        var _nearIdx = 0;
+        function closestOnCurve(x, z, out, full) {
+            var n = roadPts.length;
+            if (full) {
+                // Búsqueda completa (usada durante la carga, cuando las llamadas no son consecutivas)
+                var bestDf = Infinity;
+                var bestIf = 0;
+                for (var qf = 0; qf < n; qf++) {
+                    var rfp = roadPts[qf];
+                    var dxf = rfp.x - x;
+                    var dzf = rfp.z - z;
+                    var df = dxf * dxf + dzf * dzf;
+                    if (df < bestDf) { bestDf = df; bestIf = qf; }
+                }
+                _nearIdx = bestIf;
+                out.copy(roadPts[bestIf]);
+                return out;
+            }
+            // Búsqueda local (runtime): arranca en el índice del frame anterior y se expande
+            var idx = _nearIdx;
+            var bestD = Infinity;
+            var bestI = idx;
+            // expandir hacia delante
+            for (var q = 0; q < n; q++) {
+                var j = (idx + q) % n;
+                var rp = roadPts[j];
+                var dx = rp.x - x;
+                var dz = rp.z - z;
+                var d = dx * dx + dz * dz;
+                if (d < bestD) { bestD = d; bestI = j; }
+                else if (q > 4) break; // deja de mejorar => salir
+            }
+            // expandir hacia atrás
+            for (var q2 = 1; q2 < n; q2++) {
+                var j2 = idx - q2;
+                if (j2 < 0) j2 += n;
+                var rp2 = roadPts[j2];
+                var dx2 = rp2.x - x;
+                var dz2 = rp2.z - z;
+                var d2 = dx2 * dx2 + dz2 * dz2;
+                if (d2 < bestD) { bestD = d2; bestI = j2; }
+                else if (q2 > 4) break;
+            }
+            _nearIdx = bestI;
+            out.copy(roadPts[bestI]);
+            return out;
+        }
+        // ¿Está un punto dentro de alguna carretera (principal o desvíos)?
+        // Devuelve true si está sobre asfalto (no pasto).
+        function isOnAnyRoad(x, z) {
+            closestOnCurve(x, z, nearCurve, true);
+            var mdx = x - nearCurve.x;
+            var mdz = z - nearCurve.z;
+            var mRoadMargin = ROAD_W / 2 + 1.5;
+            if (Math.sqrt(mdx * mdx + mdz * mdz) <= mRoadMargin) return true;
+            var sMargin = (roadWForClear * 0.5 + 1.5);
+            for (var ir = 0; ir < sideRoadPtsPer.length; ir++) {
+                var path = sideRoadPtsPer[ir];
+                var best = Infinity;
+                for (var ip = 0; ip < path.length; ip++) {
+                    var p = path[ip];
+                    var dx = p.x - x, dz = p.z - z;
+                    var d2 = dx * dx + dz * dz;
+                    if (d2 < best) best = d2;
+                }
+                if (best <= sMargin * sMargin) return true;
+            }
+            return false;
+        }
+        function treeClear(tx, tz, margin) {
+            closestOnCurve(tx, tz, nearCurve, true);
+            var dx = tx - nearCurve.x;
+            var dz = tz - nearCurve.z;
+            if (Math.sqrt(dx * dx + dz * dz) <= ROAD_W / 2 + margin) return true;
+            // También mantener libres las vías secundarias (más anchas, VERDE)
+            for (var sk2 = 0; sk2 < sideRoadPtsPer.length; sk2++) {
+                var pth = sideRoadPtsPer[sk2];
+                // Búsqueda rápida: punto más cercano de este camino
+                var bd2 = Infinity;
+                var bi2 = 0;
+                for (var sq2 = 0; sq2 < pth.length; sq2++) {
+                    var sp2 = pth[sq2];
+                    var sx = sp2.x - tx, sz = sp2.z - tz;
+                    var sd = sx * sx + sz * sz;
+                    if (sd < bd2) { bd2 = sd; bi2 = sq2; }
+                }
+                // comprobar las inmediaciones del punto más cercano
+                var qq = Math.max(0, bi2 - 3);
+                var qq2 = Math.min(pth.length - 1, bi2 + 3);
+                for (var sqq = qq; sqq <= qq2; sqq++) {
+                    var cpx = pth[sqq];
+                    var cdx = cpx.x - tx, cdz = cpx.z - tz;
+                    var cd = cdx * cdx + cdz * cdz;
+                    if (cd <= (roadWForClear + margin) * (roadWForClear + margin)) return true;
+                }
+            }
+            return false;
+        }
+        for (var tr = 0; tr < 4500; tr++) {
+            var tx = (Math.random() * 2 - 1) * 900;
+            var tz = (Math.random() * 2 - 1) * 900;
+            if (Math.abs(tx) > MAP / 2 - 8 || Math.abs(tz) > MAP / 2 - 8) continue;
+            if (treeClear(tx, tz, 3)) continue;
+            var groundY = terrainHeight(tx, tz);
+            var h = 2.5 + Math.random() * 4;
+            var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, h, 6), trunkMat);
+            trunk.position.set(tx, groundY + h / 2, tz);
+            trunk.castShadow = true;
+            scene.add(trunk);
+            var crownH = h * 0.9;
+            var crown = new THREE.Mesh(new THREE.ConeGeometry(2.0 + Math.random() * 1.2, crownH, 7), Math.random() > 0.5 ? leafMat : leafMat2);
+            crown.position.set(tx, groundY + h + crownH / 2, tz);
+            crown.castShadow = true;
+            scene.add(crown);
+            treeColliders.push({ x: tx, z: tz, r: 1.0 });
+        }
+
+        scene.fog = new THREE.Fog(0x9fcf86, 300, 1600);
+
+        var loadingEl = document.getElementById('loading');
+        var errorEl = document.getElementById('error');
+        var car = null;
+        var wheels = { front: [], rear: [], all: [] };
+        var keys = {};
+
+        var VehicleConfig = {
+            mass: 1000,
+            enginePower: 250,
+            maxSpeed: 70,
+            accelForce: 11000,
+            brakeForce: 18,
+            reverseForce: 6000,
+            maxSteering: 0.4,
+            steeringResponse: 5.0,
+            frontGrip: 2.0,
+            rearGrip: 1.8,
+            dragCoef: 0.35,
+            rollingCoef: 0.15,
+            centerOfMassY: 0.3,
+            wheelbase: 2.2
+        };
+
+        var carState = {
+            velocity: new THREE.Vector3(),
+            yawRate: 0,
+            heading: 0,
+            steerAngle: 0,
+            speed: 0
+        };
+
+        // ===== GAME MODE SYSTEM =====
+        var gameMode = null;          // 'fugitivo' | 'policia' | 'libre'
+        var gameStarted = false;
+        var gameEnded = false;
+        var bots = [];
+        var carModels = {};          // modelos ya transformados: carModels['carreras'], carModels['policia']
+        var botCount = 4;
+        var menuEl = document.getElementById('menu');
+        var selectEl = document.getElementById('select');
+        var resultEl = document.getElementById('result');
+        var hudEl = document.getElementById('hud');
+        var startingEl = document.getElementById('loading');
+
+        // Configuración global de la sesión (arquitectura lista para ampliar)
+        var sessionConfig = {
+            vehicle: 'auto',
+            time: 'dia',
+            weather: 'despejado',
+            difficulty: 'normal',
+            traffic: 'bajo'
+        };
+
+        // Estadísticas de la partida
+        var runStats = {
+            time: 0,
+            dist: 0,
+            topSpeedKmh: 0,
+            policeEvaded: 0,
+            collisions: 0,
+            lastPos: new THREE.Vector3()
+        };
+
+        // ===== MENU SYSTEM =====
+        var selectPendingMode = null;
+        var pendingDifficulty = 'normal';
+
+        function openMenu() {
+            silenceGameAudio();   // no escuchar nada de una partida anterior
+            menuEl.classList.remove('hidden');
+            selectEl.classList.add('hidden');
+            onlineEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+            hudEl.classList.remove('visible');
+            document.getElementById('touch').classList.remove('on');
+        }
+
+        function openSelect(mode) {
+            if (mode === 'online') { openOnlineLobby(); return; }
+            selectPendingMode = mode;
+            menuEl.classList.add('hidden');
+            selectEl.classList.remove('hidden');
+            var titles = { fugitivo: '🚨 SER FUGITIVO', policia: '🚓 SER POLICÍA', libre: '🏎️ CONDUCCIÓN LIBRE' };
+            var subs = {
+                fugitivo: 'Escapa de la policía y sobrevive el mayor tiempo posible.',
+                policia: 'Persigue al fugitivo y consigue detenerlo.',
+                libre: 'Explora el mapa sin límites.'
+            };
+            document.getElementById('selTitle').textContent = titles[mode];
+            document.getElementById('selSub').textContent = subs[mode];
+        }
+
+        function showTouch() {
+            var t = document.getElementById('touch');
+            if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+                if (gameMode === 'libre') t.classList.add('on');
+            }
+        }
+
+        function updateSessionFromSelect() {
+            function grab(id, prop) {
+                var sel = document.querySelector('#opt' + id + ' .opt-chip.selected');
+                if (sel) sessionConfig[prop] = sel.getAttribute('data-val');
+            }
+            grab('Vehicle', 'vehicle');
+            grab('Time', 'time');
+            grab('Weather', 'weather');
+            grab('Difficulty', 'difficulty');
+            pendingDifficulty = sessionConfig.difficulty;
+        }
+
+        document.querySelectorAll('.opt-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var grp = chip.parentElement;
+                grp.querySelectorAll('.opt-chip').forEach(function (c) { c.classList.remove('selected'); });
+                chip.classList.add('selected');
+            });
+        });
+        document.getElementById('btnPlay').addEventListener('click', function () {
+            updateSessionFromSelect();
+            selectEl.classList.add('hidden');
+            startGame(selectPendingMode);
+        });
+        document.getElementById('btnBack').addEventListener('click', function () {
+            selectEl.classList.add('hidden');
+            menuEl.classList.remove('hidden');
+        });
+
+        function startGame(mode) {
+            gameMode = mode;
+            gameEnded = false;
+            runStats.time = 0;
+            runStats.dist = 0;
+            runStats.topSpeedKmh = 0;
+            runStats.policeEvaded = 0;
+            runStats.collisions = 0;
+
+            if (mode === 'online') {
+                onlineStartGameLocal();
+                if (!car) { gameStarted = false; openMenu(); return; }
+                gameStarted = true;
+                hudEl.classList.add('visible');
+                runStats.lastPos.set(car.position.x, 0, car.position.z);
+                setupHud('online');
+                setupChase('online');
+                showTouch();
+                camSnap = true;
+                feedText('🟢 ¡ENFRENTAMIENTO EN LÍNEA! ' + (onlineRole === 'policia' ? '¡ATRAPA AL FUGITIVO!' : '¡ESCAPA DE LA POLICÍA!'), '#60a5fa');
+                return;
+            }
+
+            // Construir el carro del jugador según el modo
+            var isPolice = (mode === 'policia');
+            setupPlayerCar(isPolice ? 'policia' : 'carreras', isPolice);
+            // Si el modelo aún no está listo, no iniciar
+            if (!car) { gameStarted = false; openMenu(); return; }
+
+            gameStarted = true;
+            hudEl.classList.add('visible');
+            runStats.lastPos.set(car.position.x, 0, car.position.z);
+            resetPlayerStart();
+            spawnBots();
+            setupHud(mode);
+            setupChase(mode);
+            showTouch();
+            camSnap = true;
+            if (mode !== 'libre') feedText('🚨 PERSECUCIÓN INICIADA', '#ffd270');
+        }
+
+        function resetPlayerStart() {
+            car.position.set(0, 0, -860);
+            carState.heading = Math.atan2(200, 70);
+            carState.velocity.set(0, 0, 0);
+            carState.yawRate = 0;
+            carState.speed = 0;
+            runStats.lastPos.set(car.position.x, 0, car.position.z);
+        }
+
+        function backToMenu() {
+            gameStarted = false;
+            gameEnded = false;
+            removeBots();
+            removeOppCar();
+            closeOnline();
+            clearChase();
+            openMenu();
+        }
+
+        function enableMenuButtons() {
+            document.querySelectorAll('.menu-btn').forEach(function (btn) { btn.disabled = false; });
+        }
+
+        // Bloquear los botones hasta que los modelos estén cargados
+        document.querySelectorAll('.menu-btn').forEach(function (btn) {
+            btn.disabled = true;
+            btn.addEventListener('click', function () { openSelect(btn.getAttribute('data-mode')); });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                if (gameStarted && !gameEnded) { backToMenu(); }
+                else if (!gameStarted && !selectEl.classList.contains('hidden')) { openMenu(); }
+                else if (!gameStarted && onlineEl && !onlineEl.classList.contains('hidden')) {
+                    closeOnline();
+                    onlineEl.classList.add('hidden');
+                    openMenu();
+                }
+            }
+        });
+
+        document.getElementById('btnRetry').addEventListener('click', function () {
+            resultEl.classList.add('hidden');
+            startGame(gameMode);
+        });
+        document.getElementById('btnResultMenu').addEventListener('click', function () {
+            backToMenu();
+        });
+
+        // ===== MULTIJUGADOR EN LÍNEA =====
+        var onlineEl = document.getElementById('online');
+        var olActions = document.getElementById('olActions');
+        var olWaiting = document.getElementById('olWaiting');
+        var olStatus = document.getElementById('olStatus');
+        // Perfil / nombre de jugador (se recuerda en el navegador)
+        var playerNick = 'Jugador';
+        try { playerNick = localStorage.getItem('invasion_nick') || 'Jugador'; } catch (e) {}
+        function savePlayerNick(n) {
+            playerNick = n || 'Jugador';
+            try { localStorage.setItem('invasion_nick', playerNick); } catch (e) {}
+        }
+        var onlineWs = null;
+        var SB_URL = 'https://YOUR-PROJECT.supabase.co';   // TODO: fill user URL
+        var SB_ANON = 'eyJ...';                            // TODO: fill user anon key
+        var sbClient = null;
+        var sbChannel = null;
+        var onlineIsCreator = false;
+        var myLocalId = null;
+        var prevPresenceSlots = {};
+        var onlineRole = null;          // 'policia' | 'fugitivo'
+        var onlineCode = null;
+        var onlineReady = false;
+        var onlineMySlot = -1;          // el slot propio asignado por presencia
+        var onlineMaxPlayers = 4;       // jugadores máximos por sala
+        var onlineOpps = {};            // map slot -> { group, state:{has,cx,cz,cheading,tx,tz,theading,tspeed}, nick, role }
+        var onlineSendAccum = 0;
+        var onlineCatchAccum = 0;
+        var onlineEscapeAccum = 0;
+        var onlineDone = false;
+        var onlineResultWinner = null;
+        var onlineCount = 0;         // cuenta regresiva: 0 = no activa
+        var onlineCountT = 0;
+        var onlineShown = 0;
+        var onlineCountEl = document.getElementById('countdown');
+        var onlineHits = 0;                 // choques que el POLICÍA le ha dado al fugitivo (para ganar con 2)
+        var onlineHitCooldown = 0;      // enfriamiento para no contar el mismo impacto varias veces
+
+        function wsSend(obj) {
+            if (obj.type === 'create') {
+                onlineIsCreator = true;
+                var code = '';
+                var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                for (var ci = 0; ci < 4; ci++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+                onlineCode = code;
+                myLocalId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+                prevPresenceSlots = {};
+                sbChannel = sbClient.channel('room:' + code, { params: { broadcast: { self: false } } });
+                sbChannel.on('presence', { event: 'sync' }, handlePresenceSync);
+                sbChannel.on('broadcast', { event: '*' }, handleBroadcast);
+                sbChannel.subscribe(function (status) {
+                    if (status === 'SUBSCRIBED') {
+                        sbChannel.track({ nick: obj.nick || playerNick, isCreator: true, role: 'policia', localId: myLocalId });
+                    }
+                });
+            } else if (obj.type === 'join') {
+                onlineIsCreator = false;
+                var joinCode = (obj.code || '').toUpperCase();
+                onlineCode = joinCode;
+                myLocalId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+                prevPresenceSlots = {};
+                sbChannel = sbClient.channel('room:' + joinCode, { params: { broadcast: { self: false } } });
+                sbChannel.on('presence', { event: 'sync' }, handlePresenceSync);
+                sbChannel.on('broadcast', { event: '*' }, handleBroadcast);
+                sbChannel.subscribe(function (status) {
+                    if (status === 'SUBSCRIBED') {
+                        sbChannel.track({ nick: obj.nick || playerNick, isCreator: false, role: null, localId: myLocalId });
+                    }
+                });
+            } else {
+                if (!sbChannel) return;
+                var payload = {};
+                for (var pk in obj) { if (pk !== 'type') payload[pk] = obj[pk]; }
+                payload.fromSlot = onlineMySlot;
+                sbChannel.send({ type: 'broadcast', event: obj.type, payload: payload });
+            }
+        }
+        function closeOnline() {
+            if (sbChannel) {
+                try { sbChannel.unsubscribe(); if (sbClient) sbClient.removeChannel(sbChannel); } catch (e) {}
+                sbChannel = null;
+            }
+            onlineReady = false;
+            onlineCode = null;
+            onlineIsCreator = false;
+            onlineMySlot = -1;
+            myLocalId = null;
+            prevPresenceSlots = {};
+            removeAllOpps();
+        }
+        function openOnlineLobby() {
+            if (!playerNick) playerNick = 'Jugador';
+            var nickInp = document.getElementById('olNick');
+            if (nickInp) nickInp.value = playerNick;
+            menuEl.classList.add('hidden');
+            selectEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+            onlineEl.classList.remove('hidden');
+            onlineMySlot = -1;
+            removeAllOpps();
+            document.getElementById('olChatList').innerHTML = '';
+            olActions.style.display = '';
+            olWaiting.style.display = 'none';
+            olStatus.className = 'sel-sub';
+            olStatus.style.color = '#fbbf24';
+            olStatus.textContent = 'Esperando jugadores…';
+        }
+        function showOnlineWaiting(subt, code) {
+            olActions.style.display = 'none';
+            olWaiting.style.display = '';
+            document.getElementById('olRole').textContent = onlineRole === 'policia' ? '🚓 POLICÍA' : '🏎️ FUGITIVO';
+            if (code) document.getElementById('olCode').textContent = code;
+            else document.getElementById('olCode').textContent = '—';
+            olStatus.textContent = subt;
+            olStatus.className = 'sel-sub';
+            olStatus.style.color = '#fbbf24';
+            renderOnlinePlayers();
+            // Sólo el creador de sala (slot 0) puede iniciar cuando hay al menos 1 rival
+            var startBtn = document.getElementById('btnStartRoom');
+            var canStart = onlineIsCreator && (Object.keys(onlineOpps).length > 0);
+            startBtn.style.display = canStart ? '' : 'none';
+        }
+        function renderOnlinePlayers() {
+            var box = document.getElementById('olPlayers');
+            if (!box) return;
+            box.innerHTML = '';
+            var mine = { role: onlineRole, nick: playerNick, me: true };
+            var items = [mine];
+            for (var k in onlineOpps) {
+                var o = onlineOpps[k];
+                items.push({ role: o.role, nick: o.nick, me: false });
+            }
+            items.forEach(function (it) {
+                var d = document.createElement('div');
+                d.className = 'ol-player-chip ' + (it.role === 'policia' ? 'cop' : 'fug');
+                d.textContent = (it.role === 'policia' ? '🚓' : '🏎️') + ' ' + (it.me ? 'Tú — ' : '') + it.nick;
+                box.appendChild(d);
+            });
+        }
+        function beginOnlineGame() {
+            if (onlineDone || gameStarted) return;
+            onlineEl.classList.add('hidden');
+            startGame('online');
+            onlineCount = 3;
+            onlineCountT = 0;
+            onlineShown = 0;
+            onlineCountEl.style.display = 'none';
+            onlineCountEl.classList.remove('go');
+        }
+        function onlineSetStatus(txt, isErr) {
+            olStatus.textContent = txt;
+            olStatus.className = 'sel-sub' + (isErr ? ' online-error' : ' online-wait');
+            olStatus.style.color = isErr ? '#f87171' : '#fbbf24';
+        }
+        function onlineConnect(afterOpen) {
+            if (!sbClient) {
+                sbClient = window.supabase.createClient(SB_URL, SB_ANON, { realtime: {} });
+            }
+            if (afterOpen) afterOpen();
+        }
+        function handlePresenceSync() {
+            var state = sbChannel.presenceState();
+            var allKeys = Object.keys(state).sort();
+            var myKey = null;
+            var i;
+            for (i = 0; i < allKeys.length; i++) {
+                var metas = state[allKeys[i]];
+                if (metas && metas.length > 0 && metas[0].localId === myLocalId) {
+                    myKey = allKeys[i];
+                    break;
+                }
+            }
+            if (!myKey) return;
+            var myIndex = allKeys.indexOf(myKey);
+            onlineMySlot = myIndex;
+            onlineRole = myIndex % 2 === 0 ? 'policia' : 'fugitivo';
+            onlineMaxPlayers = 4;
+            onlineIsCreator = false;
+            for (i = 0; i < allKeys.length; i++) {
+                var m = state[allKeys[i]];
+                if (m && m.length > 0 && m[0].isCreator) {
+                    if (allKeys[i] === myKey) onlineIsCreator = true;
+                }
+            }
+            onlineReady = true;
+            var newSlots = {};
+            for (i = 0; i < allKeys.length; i++) {
+                var metas2 = state[allKeys[i]];
+                if (!metas2 || metas2.length === 0) continue;
+                var meta = metas2[0];
+                var oppRole = i % 2 === 0 ? 'policia' : 'fugitivo';
+                newSlots[i] = true;
+                if (allKeys[i] !== myKey) {
+                    if (!prevPresenceSlots[i]) {
+                        makeOpp(i, oppRole, meta.nick || 'Jugador');
+                        addChat('[SISTEMA] ' + (meta.nick || 'Jugador') + ' se unio a la sala', '#60a5fa');
+                    } else {
+                        if (onlineOpps[i]) {
+                            onlineOpps[i].nick = meta.nick || 'Jugador';
+                            onlineOpps[i].role = oppRole;
+                        } else {
+                            makeOpp(i, oppRole, meta.nick || 'Jugador');
+                        }
+                    }
+                }
+            }
+            for (var kk in prevPresenceSlots) {
+                var slotNum = parseInt(kk);
+                if (!newSlots[kk] && slotNum !== onlineMySlot) {
+                    removeOpp(slotNum);
+                    if (gameStarted && !gameEnded) {
+                        updateOppLabels();
+                        if (Object.keys(onlineOpps).length === 0) {
+                            onlineResultWinner = onlineRole;
+                            chaseWon = true;
+                            showResultScreen();
+                        }
+                    } else if (!gameStarted && !onlineEl.classList.contains('hidden')) {
+                        onlineSetStatus(' Un jugador abandono la sala', false);
+                        addChat('[SISTEMA] Un jugador se fue', '#f87171');
+                    }
+                }
+            }
+            prevPresenceSlots = newSlots;
+            renderOnlinePlayers();
+            if (!gameStarted && !onlineEl.classList.contains('hidden')) {
+                if (onlineIsCreator) {
+                    if (Object.keys(onlineOpps).length > 0) {
+                        showOnlineWaiting('Esperando jugadores...', onlineCode);
+                    } else {
+                        showOnlineWaiting('Comparte el codigo ' + onlineCode + ' para que entren hasta ' + onlineMaxPlayers + ' jugadores', onlineCode);
+                    }
+                } else {
+                    showOnlineWaiting('Unido a la sala ' + onlineCode + '. Esperando a que empiece la partida...', onlineCode);
+                }
+            }
+        }
+        function handleBroadcast(bcast) {
+            var evt = bcast.event || bcast.type;
+            var data = bcast.payload || {};
+            if (!evt) return;
+            var msg;
+            if (evt === 'state') {
+                msg = { type: 'opponent_state', slot: data.fromSlot, state: data.state };
+            } else if (evt === 'nick') {
+                msg = { type: 'nick_changed', slot: data.fromSlot, nick: data.nick };
+            } else {
+                msg = {};
+                for (var bk in data) { if (bk !== 'fromSlot') msg[bk] = data[bk]; }
+                if (data.fromSlot !== undefined) msg.slot = data.fromSlot;
+                msg.type = evt;
+            }
+            handleOnlineMsg(msg);
+        }
+        function makeOpp(slot, role, nick) {
+            if (onlineOpps[slot]) return onlineOpps[slot];
+            var isPolice = (role === 'policia');
+            var group = makeBotGroup(isPolice ? 'policia' : 'carreras', isPolice);
+            scene.add(group);
+            var s = onlineStartFor(onlineRole === 'policia' ? 'fugitivo' : 'policia');
+            group.position.set(s.x, terrainHeight(s.x, s.z) + 0.05, s.z);
+            group.rotation.y = s.heading;
+            onlineOpps[slot] = {
+                group: group,
+                nick: nick || 'Jugador',
+                role: role || 'fugitivo',
+                state: { has: false, cx: s.x, cz: s.z, cheading: s.heading, tx: s.x, tz: s.z, theading: s.heading, tspeed: 0 }
+            };
+            return onlineOpps[slot];
+        }
+        function removeOpp(slot) {
+            var o = onlineOpps[slot];
+            if (o) { scene.remove(o.group); delete onlineOpps[slot]; }
+        }
+        function removeAllOpps() {
+            for (var k in onlineOpps) removeOpp(k);
+        }
+        function handleOnlineMsg(msg) {
+            switch (msg.type) {
+                case 'error':
+                    onlineSetStatus('⚠️ ' + msg.message, true);
+                    break;
+                case 'created':
+                    onlineRole = msg.role;
+                    onlineCode = msg.code;
+                    onlineMySlot = msg.slot;
+                    onlineMaxPlayers = msg.maxPlayers || 4;
+                    showOnlineWaiting('Comparte el código ' + msg.code + ' para que entren hasta ' + onlineMaxPlayers + ' jugadores', msg.code);
+                    break;
+                case 'joined':
+                    onlineRole = msg.role;
+                    onlineCode = msg.code;
+                    onlineMySlot = msg.slot;
+                    onlineMaxPlayers = msg.maxPlayers || 4;
+                    // Ya hay otros jugadores en la sala: crearlos como oponentes
+                    if (msg.players) msg.players.forEach(function (p) { makeOpp(p.slot, p.role, p.nick); });
+                    showOnlineWaiting('Unido a la sala ' + msg.code + '. Esperando a que empiece la partida…', msg.code);
+                    break;
+                case 'peer_joined':
+                    if (msg.player && msg.player.slot !== onlineMySlot) {
+                        makeOpp(msg.player.slot, msg.player.role, msg.player.nick);
+                        addChat('[SISTEMA] ' + (msg.player.nick || 'Jugador') + ' se unió a la sala', '#60a5fa');
+                    }
+                    renderOnlinePlayers();
+                    showOnlineWaiting(olStatus.textContent, onlineCode);
+                    break;
+                case 'nick_changed':
+                    if (onlineOpps[msg.slot]) { onlineOpps[msg.slot].nick = msg.nick; updateOppLabels(); }
+                    renderOnlinePlayers();
+                    break;
+                case 'chat':
+                    addChat((msg.slot === onlineMySlot ? 'Tú' : (msg.nick || 'Jugador')) + ': ' + msg.text, '#e2e8f0');
+                    break;
+                case 'room_ready':
+                case 'start':
+                    onlineReady = true;
+                    onlineEl.classList.add('hidden');
+                    startGame('online');
+                    // Cuenta regresiva antes de poder moverse
+                    onlineCount = 3;
+                    onlineCountT = 0;
+                    onlineShown = 0;
+                    onlineCountEl.style.display = 'none';
+                    onlineCountEl.classList.remove('go');
+                    break;
+                case 'opponent_state':
+                    var st = msg.state || {};
+                    if (st.x !== undefined && st.z !== undefined) {
+                        var opp = onlineOpps[msg.slot];
+                        if (opp) {
+                            var O = opp.state;
+                            if (!O.has) { O.cx = st.x; O.cz = st.z; O.cheading = st.heading || 0; }
+                            O.tx = st.x; O.tz = st.z; O.theading = st.heading || 0; O.tspeed = st.speed || 0;
+                            O.has = true;
+                        }
+                    }
+                    break;
+                case 'result':
+                    if (!onlineDone && !gameEnded) {
+                        gameStarted = false;
+                        if (msg.slot !== onlineMySlot) {
+                            // Otro jugador anunció el resultado
+                            onlineResultWinner = msg.winner;
+                            onlineDone = true;
+                            showOnlineResult(msg.winner);
+                        }
+                    }
+                    break;
+                case 'peer_left':
+                    if (gameStarted && !gameEnded) {
+                        removeOpp(msg.slot);
+                        updateOppLabels();
+                        if (Object.keys(onlineOpps).length === 0) {
+                            // todos los rivales se fueron → victoria por abandono
+                            onlineResultWinner = onlineRole;
+                            chaseWon = true;
+                            showResultScreen();
+                        }
+                    } else if (!gameStarted && !onlineEl.classList.contains('hidden')) {
+                        removeOpp(msg.slot);
+                        onlineSetStatus('👋 ' + (msg.players && msg.players.length ? 'Jugador abandonó la sala' : 'Los rivales abandonaron la sala'), false);
+                        addChat('[SISTEMA] ' + ((msg.players && msg.players.length) ? 'Un jugador se fue' : 'La sala se quedó vacía'), '#f87171');
+                        renderOnlinePlayers();
+                        showOnlineWaiting(olStatus.textContent, onlineCode);
+                    }
+                    break;
+            }
+        }
+        function onlineStartFor(role) {
+            // Posición de salida en la vía según el rol, adelantados en el circuito
+            // (el fugitivo y el policía arrancan MÁS ADELANTE, no en la línea de la unión sur)
+            var baseIdx = nearestRoadIdx(0, -860);
+            var ahead = 700;   // cuántos índices avanzar por la vía
+            var fidx = ((baseIdx + ahead) % roadPts.length + roadPts.length) % roadPts.length;
+            if (role === 'policia') {
+                // El policía arranca pocos índices DETRÁS del fugitivo para que
+                // empiecen cerca (unos ~40 unidades), sin que ambos se pisen.
+                var pidx = ((fidx - 12) % roadPts.length + roadPts.length) % roadPts.length;
+                var pt = roadPts[pidx];
+                var tt = roadCurve.getTangent(pidx / (roadPts.length - 1));
+                return { x: pt.x, z: pt.z, heading: Math.atan2(tt.x, tt.z) };
+            }
+            var ptf = roadPts[fidx];
+            var ttf = roadCurve.getTangent(fidx / (roadPts.length - 1));
+            return { x: ptf.x, z: ptf.z, heading: Math.atan2(ttf.x, ttf.z) };
+        }
+        function onlineStartGameLocal() {
+            var isPolice = (onlineRole === 'policia');
+            setupPlayerCar(isPolice ? 'policia' : 'carreras', isPolice);
+            if (!car) return;
+            // Posición de salida según rol
+            var s = onlineStartFor(onlineRole);
+            car.position.set(s.x, 0, s.z);
+            carState.heading = s.heading;
+            carState.velocity.set(0, 0, 0);
+            carState.yawRate = 0;
+            carState.speed = 0;
+            // Los oponentes ya existen (onlineOpps); solo limpiar bots locales.
+            removeBots();
+            onlineSendAccum = 0;
+            onlineCatchAccum = 0;
+            onlineEscapeAccum = 0;
+            onlineHits = 0;
+            onlineHitCooldown = 0;
+            onlineDone = false;
+            onlineResultWinner = null;
+            updateOppLabels();
+        }
+        function removeOppCar() {
+            removeAllOpps();
+        }
+        function updateOppLabels() {
+            // Muestra un rótulo con el nick encima de cada oponente
+            for (var k in onlineOpps) {
+                var o = onlineOpps[k];
+                if (!o.label) {
+                    // Pequeño texto 3D sencillo: un sprite tipo placa
+                    o.label = makeOppLabel(o.nick);
+                    if (o.label) scene.add(o.label);
+                } else {
+                    o.label.position.set(o.group.position.x, o.group.position.y + 2.6, o.group.position.z);
+                    if (o.label.userData && o.label.userData.elm) {
+                        o.label.userData.elm.textContent = o.nick;
+                        o.label.userData.elm.style.color = o.role === 'policia' ? '#ff6b6b' : '#fbbf24';
+                    }
+                }
+            }
+        }
+        function makeOppLabel(nick) {
+            // Texto 2D sobre el 3D vía CSS2D-like sencillo (Sprite con canvas)
+            var canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            var ctx = canvas.getContext('2d');
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, 0, 256, 64);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(nick, 128, 40);
+            var tex = new THREE.CanvasTexture(canvas);
+            var mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+            var sp = new THREE.Sprite(mat);
+            sp.scale.set(4, 1, 1);
+            return sp;
+        }
+        function updateOnlineOpp(dt) {
+            for (var k in onlineOpps) {
+                var o = onlineOpps[k];
+                var O = o.state;
+                if (!O.has) continue;
+                var kk = Math.min(1, dt * 10);
+                O.cx += (O.tx - O.cx) * kk;
+                O.cz += (O.tz - O.cz) * kk;
+                var dh = O.theading - O.cheading;
+                while (dh > Math.PI) dh -= Math.PI * 2;
+                while (dh < -Math.PI) dh += Math.PI * 2;
+                O.cheading += dh * kk;
+                var gy = terrainHeight(O.cx, O.cz) + 0.05;
+                o.group.position.set(O.cx, gy, O.cz);
+                o.group.rotation.y = O.cheading;
+                if (o.label) o.label.position.set(O.cx, gy + 2.6, O.cz);
+            }
+        }
+        // Devuelve la distancia al fugitivo más cercano (o null si no hay)
+        function nearestFugitiveDist() {
+            var best = null;
+            for (var k in onlineOpps) {
+                var o = onlineOpps[k];
+                if (o.role === 'fugitivo') {
+                    var dx = o.state.cx - car.position.x;
+                    var dz = o.state.cz - car.position.z;
+                    var d = Math.sqrt(dx * dx + dz * dz);
+                    if (best === null || d < best) best = d;
+                }
+            }
+            return best;
+        }
+        function updateOnlineResult(dt) {
+            if (gameEnded || onlineDone) return;
+            if (onlineRole === 'policia') {
+                // El policía gana al chocar 2 veces al fugitivo (contador onlineHits).
+                if (onlineHits >= 2) {
+                    feedText('🚨 ¡DOBLE IMPACTO! FUGITIVO DETENIDO', '#ff6b6b');
+                    onlineFinish('policia');
+                }
+            } else {
+                // Fugitivo: la partida acaba cuando se aleja bastante de TODOS los policías
+                var d = nearestFugitiveDist();
+                if (d !== null) {
+                    if (d > 240) {
+                        onlineEscapeAccum += dt;
+                        if (onlineEscapeAccum > 5) onlineFinish('fugitivo');
+                    } else {
+                        onlineEscapeAccum = Math.max(0, onlineEscapeAccum - dt);
+                    }
+                }
+            }
+        }
+        function onlineFinish(winner) {
+            if (onlineDone) return;
+            onlineDone = true;
+            wsSend({ type: 'result', winner: winner });
+            showOnlineResult(winner);
+        }
+        function showOnlineResult(winner) {
+            if (gameEnded) return;   // ya se mostró la pantalla → no sobrescribir
+            gameEnded = true;
+            gameStarted = false;
+            onlineResultWinner = winner;
+            chaseWon = (winner === onlineRole);
+            showResultScreen();
+        }
+
+        // ===== CHAT EN LÍNEA =====
+        var onlineChatLog = [];
+        function addChat(text, color) {
+            var box = document.getElementById('olChatList');
+            if (!box) return;
+            var d = document.createElement('div');
+            d.style.color = color || '#e2e8f0';
+            d.style.padding = '3px 0';
+            d.style.fontSize = '13px';
+            d.textContent = text;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+            onlineChatLog.push(text);
+            if (onlineChatLog.length > 50) onlineChatLog.shift();
+        }
+
+        document.getElementById('btnCreateRoom').addEventListener('click', function () {
+            onlineConnect(function () { wsSend({ type: 'create', role: 'policia', nick: playerNick }); });
+        });
+        document.getElementById('btnJoinRoom').addEventListener('click', function () {
+            var code = (document.getElementById('olJoinCode').value || '').trim().toUpperCase();
+            if (!code) { onlineSetStatus('✏️ Escribe el código de sala', true); return; }
+            onlineConnect(function () { wsSend({ type: 'join', code: code, nick: playerNick }); });
+        });
+        document.getElementById('btnCopyCode').addEventListener('click', function () {
+            var txt = (onlineCode || '');
+            if (navigator.clipboard && txt) navigator.clipboard.writeText(txt).then(function () {
+                document.getElementById('btnCopyCode').textContent = '✅ ¡COPIADO!';
+                setTimeout(function () { document.getElementById('btnCopyCode').textContent = '📋 COPIAR CÓDIGO'; }, 1500);
+            });
+        });
+        document.getElementById('btnCancelOnline').addEventListener('click', function () {
+            closeOnline();
+            onlineEl.classList.add('hidden');
+            openMenu();
+        });
+        document.getElementById('btnSaveNick').addEventListener('click', function () {
+            var n = (document.getElementById('olNick').value || '').trim();
+            if (!n) { onlineSetStatus('✏️ Escribe tu nombre', true); return; }
+            savePlayerNick(n);
+            if (sbChannel) wsSend({ type: 'nick', nick: playerNick });
+            this.textContent = '✅ ¡GUARDADO!';
+            var self2 = this;
+            setTimeout(function () { self2.textContent = 'GUARDAR NOMBRE'; }, 1500);
+        });
+        document.getElementById('btnStartRoom').addEventListener('click', function () {
+            // El creador inicia la partida para todos
+            if (Object.keys(onlineOpps).length === 0) { onlineSetStatus('👥 Añade al menos 1 jugador antes de iniciar', true); return; }
+            beginOnlineGame();   // inicio local
+            wsSend({ type: 'start' });   // el servidor lo difunde a los demás
+        });
+        // Enviar chat (Enter) y botón
+        var olChatInput = document.getElementById('olChatInput');
+        if (olChatInput) {
+            olChatInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') sendOnlineChat();
+            });
+            var chBtn = document.getElementById('btnSendChat');
+            if (chBtn) chBtn.addEventListener('click', sendOnlineChat);
+        }
+        function sendOnlineChat() {
+            var inp = document.getElementById('olChatInput');
+            var text = (inp.value || '').trim();
+            if (!text) return;
+            if (sbChannel) {
+                addChat('Tu: ' + text, '#e2e8f0');
+                wsSend({ type: 'chat', text: text });
+                inp.value = '';
+            } else {
+                onlineSetStatus('En linea: no conectado', true);
+            }
+        }
+
+        // ===== RESULT SYSTEM =====
+        function showResultScreen() {
+            gameStarted = false;
+            gameEnded = true;
+            hudEl.classList.remove('visible');
+            document.getElementById('touch').classList.remove('on');
+            removeBots();
+            clearChase();
+
+            var km = (runStats.dist / 1000);
+            var minutes = Math.floor(runStats.time / 60);
+            var seconds = Math.floor(runStats.time % 60);
+            var timeStr = (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+            var title, emoji, sub;
+            var stats = [];
+
+            function statRow(label, val) { return '<div class="res-stat"><span>' + label + '</span><b>' + val + '</b></div>'; }
+
+            if (gameMode === 'online') {
+                var w = onlineResultWinner;
+                if (w === onlineRole) {
+                    if (onlineRole === 'policia') {
+                        emoji = '🚓'; title = '¡FUGITIVO DETENIDO!'; sub = 'Capturaste al otro jugador';
+                    } else {
+                        emoji = '🏆'; title = '¡HAS ESCAPADO!'; sub = 'Dejaste atrás a la policía';
+                    }
+                } else {
+                    if (onlineRole === 'policia') {
+                        emoji = '😤'; title = 'PERDISTE · SE TE ESCAPÓ'; sub = 'El fugitivo logró huir';
+                    } else {
+                        emoji = '🚔'; title = 'PERDISTE · CAPTURADO'; sub = 'La policía te detuvo';
+                    }
+                }
+                stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
+                stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
+                stats.push(statRow('Tiempo de persecución', timeStr));
+            } else if (gameMode === 'fugitivo') {
+                var ok = chaseWon;
+                emoji = ok ? '🏆' : '🚔';
+                title = ok ? '¡HAS ESCAPADO!' : 'CAPTURADO';
+                sub = ok ? 'Saliste de la zona de búsqueda' : 'La policía te detuvo';
+                stats.push(statRow('Tiempo de persecución', timeStr));
+                stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
+                stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
+                stats.push(statRow('Policías evadidos', runStats.policeEvaded));
+                if (!ok) stats.push(statRow('Nivel de alerta', runStats.alertLevel || 1));
+            } else if (gameMode === 'policia') {
+                emoji = '🚓';
+                title = '✓ OBJETIVO DETENIDO';
+                sub = 'Capturaste al fugitivo';
+                stats.push(statRow('Tiempo de persecución', timeStr));
+                stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
+                stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
+                stats.push(statRow('Colisiones', runStats.collisions));
+            } else {
+                emoji = '🏎️';
+                title = 'CONDUCCIÓN COMPLETADA';
+                sub = 'Modo libre';
+                stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
+                stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
+                stats.push(statRow('Tiempo conduciendo', timeStr));
+            }
+
+            document.getElementById('resEmoji').textContent = emoji;
+            document.getElementById('resTitle').textContent = title;
+            document.getElementById('resSub').textContent = sub;
+            document.getElementById('resStats').innerHTML = stats.join('');
+            resultEl.classList.remove('hidden');
+        }
+
+        // ===== AUDIO FEEDBACK (leve, no saturado) =====
+        var chaseBeep = null;      // oscilador para alertas
+        var chaseBeepGain = null;
+        function chaseBeepToggle() {
+            // pequeños bips no saturados al arrancar/terminar persecución
+            try {
+                if (!audioCtx || !chaseBeep) return;
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                chaseBeepGain.gain.value = 0.0;
+            } catch (e) {}
+        }
+
+        // ===== Construir el carro del jugador según el modelo elegido =====
+        function setupPlayerCar(modelKey, isPolice) {
+            var src = carModels[modelKey];
+            if (!src) return;
+
+            // Quitar el carro anterior
+            if (car) { scene.remove(car); car = null; }
+            wheels.all = [];
+            wheels.front = [];
+            wheels.rear = [];
+            sirenLights = [];
+            if (sirenSpot && sirenSpot.parent) sirenSpot.parent.remove(sirenSpot);
+            sirenSpot = null;
+            sirenOn = false;
+            sirenElapsed = 0;
+
+            // Clonar el modelo y agruparlo
+            var pivot = new THREE.Group();
+            var mdl = src.clone(true);
+            mdl.traverse(function (child) {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    var n = child.name.toLowerCase();
+                    if (n.indexOf('whell') >= 0) wheels.all.push(child);
+                }
+            });
+            pivot.add(mdl);
+            scene.add(pivot);
+            car = pivot;
+            pivot.position.set(0, 0, -860);
+            scene.updateMatrixWorld(true);
+
+            // Centrar y rotar cada rueda sobre su propio eje (geometría propia para no afectar al clon)
+            for (var i = 0; i < wheels.all.length; i++) {
+                var wc = wheels.all[i];
+                if (!wc.geometry) continue;
+                var geo = wc.geometry.clone();
+                wc.geometry = geo;
+                geo.computeBoundingBox();
+                var bb = geo.boundingBox;
+                var center = new THREE.Vector3();
+                bb.getCenter(center);
+                geo.translate(-center.x, -center.y, -center.z);
+                wc.position.x += center.x;
+                wc.position.y += center.y;
+                wc.position.z += center.z;
+            }
+            wheels.front = [wheels.all[0], wheels.all[3]];
+            wheels.rear = [wheels.all[1], wheels.all[2]];
+
+            // Sirena solo en el carro de policía
+            if (isPolice) {
+                var roofHeight = src.roofHeight || 1.0;
+                sirenSpot = new THREE.PointLight(0xff2222, 0, 40, 2);
+                sirenSpot.position.set(0, roofHeight + 0.4, 0.2);
+                car.add(sirenSpot);
+                sirenLights.push(sirenSpot);
+            }
+            console.log('Carro del jugador montado:', modelKey, 'ruedas:', wheels.all.length);
+        }
+
+        // ===== Bots (persiguen o huyen según el modo) =====
+        function makeBotGroup(modelKey, isPolice) {
+            var g = new THREE.Group();
+            var src = carModels[modelKey];
+            if (src) {
+                var clone = src.clone(true);
+                clone.traverse(function (c) {
+                    if (c.isMesh) {
+                        c.castShadow = true;
+                        c.receiveShadow = true;
+                    }
+                });
+                g.add(clone);
+            } else {
+                // Fallback: caja simple
+                var body = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.6, 0.6, 3.0),
+                    new THREE.MeshStandardMaterial({ color: 0xcccccc })
+                );
+                body.position.y = 0.5;
+                g.add(body);
+            }
+            // Luces de sirena para los coches de policía (bots)
+            if (isPolice) {
+                var rh = (src && src.roofHeight) ? src.roofHeight : 1.0;
+                var sl = new THREE.PointLight(0xff2222, 0, 30, 2);
+                sl.position.set(0, rh + 0.4, 0.2);
+                g.add(sl);
+                g.userData.sirenLight = sl;
+            }
+            return g;
+        }
+
+        // Índice del punto de la vía más cercano a una posición (búsqueda gruesa + afinado local)
+        function nearestRoadIdx(x, z) {
+            var n = roadPts.length;
+            var coarse = Math.max(1, Math.floor(n / 200));
+            var best = 0, bestD = Infinity;
+            for (var i = 0; i < n; i += coarse) {
+                var dx = roadPts[i].x - x, dz = roadPts[i].z - z;
+                var d = dx * dx + dz * dz;
+                if (d < bestD) { bestD = d; best = i; }
+            }
+            var win = Math.max(6, coarse);
+            for (var o = -win; o <= win; o++) {
+                var j = (best + o + n) % n;
+                var dx2 = roadPts[j].x - x, dz2 = roadPts[j].z - z;
+                var d2 = dx2 * dx2 + dz2 * dz2;
+                if (d2 < bestD) { bestD = d2; best = j; }
+            }
+            return best;
+        }
+
+        // ===== CHASE MANAGER (IA de persecución por estados) =====
+        /*
+          DifficultyManager
+            - facíl:   policía lento, reacción lenta, más errores, detecta menos
+            - normal:  equilibrio
+            - dificíl: mejor anticipación, reacción rápida, mayor velocidad
+        */
+        var DIFFICULTY = {
+            facil:   { maxSpeed: 46, detect: 320, predTime: 0.55, speedNoise: 0.10, steerNoise: 0.020, react: 8, chaseSpeed: 40 },
+            normal:  { maxSpeed: 55, detect: 420, predTime: 0.80, speedNoise: 0.05, steerNoise: 0.012, react: 10, chaseSpeed: 48 },
+            dificil: { maxSpeed: 63, detect: 520, predTime: 1.15, speedNoise: 0.02, steerNoise: 0.006, react: 14, chaseSpeed: 56 }
+        };
+
+        var chaseWon = false;          // resultado de la persecución (fugitivo)
+        var chase = {
+            active: false,             // ¿hay persecución en curso?
+            alertLevel: 1,
+            policeCount: 0,
+            lostTimer: 0,              // tiempo sin contacto
+            escapeAccum: 0,            // tiempo fuera de rango para escapar (fugitivo)
+            detAccum: 0,               // tiempo cerca del fugitivo para detener (policía)
+            detNotify: 0,
+            catchTimer: 0,             // tiempo seguido con la policía encima (captura física)
+            lastMsg: '',
+            msgTimer: 0
+        };
+
+        function setupChase(mode) {
+            chase.active = false;
+            chase.alertLevel = 1;
+            chase.policeCount = mode === 'fugitivo' ? policeCars().length : 0;
+            chase.lostTimer = 0;
+            chase.escapeAccum = 0;
+            chase.detAccum = 0;
+            chase.detNotify = 0;
+            chase.catchTimer = 0;
+            chaseWon = false;
+        }
+
+        function clearChase() {
+            chase.active = false;
+        }
+
+        function policeCars() {
+            var out = [];
+            for (var i = 0; i < bots.length; i++) {
+                if (bots[i].isPolice) out.push(bots[i]);
+            }
+            return out;
+        }
+        function fugitiveCars() {
+            var out = [];
+            for (var i = 0; i < bots.length; i++) {
+                if (!bots[i].isPolice) out.push(bots[i]);
+            }
+            return out;
+        }
+
+        function feedText(msg, color) {
+            var el = document.getElementById('hudFeed');
+            el.textContent = msg;
+            el.style.color = color || '#ffd270';
+            el.style.transition = 'none';
+            el.style.opacity = 1;
+            // se desvanece en el update
+            chase.detNotify = 1.6;
+            chase.lastMsg = msg;
+        }
+
+        // Curvatura de la vía en un índice (0=recta, mayor=curva más cerrada)
+        function trackCurvature(idx) {
+            var n = roadPts.length;
+            var i0 = (Math.floor(idx) - 8 + n) % n;
+            var i1 = Math.floor(idx) % n;
+            var i2 = (Math.floor(idx) + 8) % n;
+            var p0 = roadPts[i0], p1 = roadPts[i1], p2 = roadPts[i2];
+            var v1 = new THREE.Vector3(p1.x - p0.x, 0, p1.z - p0.z);
+            var v2 = new THREE.Vector3(p2.x - p1.x, 0, p2.z - p1.z);
+            var ang = v1.angleTo(v2);
+            return ang / (v1.length() + v2.length());
+        }
+
+        // Curvatura local de un punto de un segmento de la red (seg=0 → vía principal)
+        function trackCurvatureOn(segIdx, idx) {
+            var pts = segments[segIdx].pts, m = pts.length;
+            if (segIdx === 0) return trackCurvature(((idx % m) + m) % m);
+            var i0 = Math.max(0, Math.floor(idx) - 8);
+            var i1 = Math.max(0, Math.min(m - 1, Math.floor(idx)));
+            var i2 = Math.min(m - 1, Math.floor(idx) + 8);
+            var p0 = pts[i0], p1 = pts[i1], p2 = pts[i2];
+            var v1 = new THREE.Vector3(p1.x - p0.x, 0, p1.z - p0.z);
+            var v2 = new THREE.Vector3(p2.x - p1.x, 0, p2.z - p1.z);
+            if (v1.length() < 1e-4 || v2.length() < 1e-4) return 0;
+            var ang = v1.angleTo(v2);
+            return ang / (v1.length() + v2.length());
+        }
+        function plantBotOn(bot, segIdx, idx) {
+            bot.segIdx = segIdx;                 // índice en 'segments' (0 = vía principal)
+            bot.idx = idx;                       // índice float dentro del segmento
+            bot.segDir = 1;                      // sentido de avance dentro del segmento
+            bot.plan = null;                     // plan de tramos hacia el objetivo
+            bot.planStep = 0;                    // tramo actual del plan
+            bot.planPKey = undefined;           // segmento del jugador al crear el plan (recompute)
+            bot.routing = false;                 // si está usando ruta por grafo (policía)
+            var s = segments[segIdx];
+            // posición/orientación inicial sobre el segmento
+            if (segIdx === 0) {
+                var t0 = roadCurve.getTangent(idx / (roadPts.length - 1));
+                bot.heading = Math.atan2(t0.x, t0.z);
+            } else {
+                var s0 = sideRoadPtsPer[segIdx - 1];
+                var tt0 = new THREE.Vector3(
+                    s0[Math.min(idx + 1, s0.length - 1)].x - s0[Math.min(idx, s0.length - 2)].x, 0,
+                    s0[Math.min(idx + 1, s0.length - 1)].z - s0[Math.min(idx, s0.length - 2)].z);
+                bot.heading = Math.atan2(tt0.x, tt0.z);
+            }
+            bot.x = s.pts[Math.round(idx)].x;
+            bot.z = s.pts[Math.round(idx)].z;
+            bot.group.position.set(bot.x, 0, bot.z);
+        }
+
+        // Devuelve la localización { seg, segIdx, idx } de una posición física (x,z).
+        function locOf(x, z) { return locateOnRoad(x, z); }
+
+        function spawnBots() {
+            removeBots();
+            if (!car) return;
+            if (gameMode === 'libre' || !roadPts.length) return;
+
+            var diff = DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal;
+            // Nivel de alerta inicial: en fugitivo comenzar con 1 policía (sistema escalable)
+            var n = gameMode === 'fugitivo' ? 1 : 2;
+            var playerIdx = nearestRoadIdx(car.position.x, car.position.z);
+            for (var bi = 0; bi < n; bi++) {
+                var isPolice = (gameMode === 'fugitivo');   // en fugitivo los bots son policías
+                var botModelKey = isPolice ? 'policia' : 'carreras';
+                var idx;
+                if (isPolice) {
+                    // El policía aparece justo DETRÁS del jugador por la vía, persiguiéndolo
+                    // desde el arranque (a distancia visible, no lejos).
+                    // Se recorre una distancia REAL hacia atrás por el trazado para evitar
+                    // que el "seam" (punto de cierre duplicado, roadPts[1400]==roadPts[0])
+                    // haga caer al policía encima del jugador al arrancar en el índice 0.
+                    var N = roadPts.length - 1;            // índices de lazo (1400 es cierre duplicado)
+                    var si = ((Math.round(playerIdx) % N) + N) % N;
+                    var backGap = 120;                      // metros reales hacia atrás (más margen de reacción)
+                    var traveled = 0, guard = 0;
+                    while (traveled < backGap && guard < N) {
+                        si = (si - 1 + N) % N;
+                        var ca = roadPts[si], nb = roadPts[(si + 1) % N];
+                        traveled += Math.hypot(nb.x - ca.x, nb.z - ca.z);
+                        guard++;
+                    }
+                    idx = si;
+                } else {
+                    // En modo policía, el fugitivo está bastante delante (más margen de persecución)
+                    var spread = (bi === 0) ? 0.12 : 0.30 + bi * 0.1;
+                    idx = ((playerIdx + Math.round(spread * roadPts.length)) % roadPts.length + roadPts.length) % roadPts.length;
+                }
+                var pt = roadPts[idx];
+                var g = makeBotGroup(botModelKey, isPolice);
+                g.position.set(pt.x, 0, pt.z);
+                scene.add(g);
+                var tt = roadCurve.getTangent(idx / (roadPts.length - 1));
+                var h0 = Math.atan2(tt.x, tt.z);
+                var bot = {
+                    group: g,
+                    x: pt.x,
+                    z: pt.z,
+                    vx: 0,
+                    vz: 0,
+                    speed: 0,
+                    heading: h0,
+                    steerAngle: 0,
+                    yawRate: 0,
+                    idx: idx,
+                    curDir: 1,          // sentido de avance: +1/-1 sobre la vía
+                    signedSpeed: 0,     // velocidad DIRIGIDA a lo largo de la vía (puede ser negativa)
+                    turnTimer: 0,       // evita cambios de sentido muy frecuentes (giros bruscos)
+                    maxSpeed: diff.maxSpeed + (Math.random() * 4 - 2),
+                    isPolice: isPolice,
+                    state: 'SEARCHING',
+                    stateTimer: 0,
+                    noise: Math.random() * 2 - 1,
+                    sirenOn: false,
+                    sirenElapsed: 0,
+                    uTurn: false,        // realizando un giro en U (semicírculo real)
+                    uTurnT: 0,           // progreso del giro en U (0..1)
+                    uTurnDir: 1,         // lado del giro (+1 derecha / -1 izquierda)
+                    uTurnCx: 0,          // centro del círculo del giro
+                    uTurnCz: 0,
+                    uTurnA0: 0,           // ángulo inicial del arco
+                    prevDP: null          // última distancia por vía (policía - jugador) para detectar rebase
+                };
+                // Extensión de enrutamiento por el grafo de carreteras
+                plantBotOn(bot, 0, idx);
+                bot.group.rotation.y = bot.heading;
+                bots.push(bot);
+            }
+        }
+
+        function removeBots() {
+            for (var i = 0; i < bots.length; i++) {
+                scene.remove(bots[i].group);
+            }
+            bots = [];
+        }
+
+        function botDistToPlayer(b) {
+            var dx = b.group.position.x - car.position.x;
+            var dz = b.group.position.z - car.position.z;
+            return Math.sqrt(dx * dx + dz * dz);
+        }
+
+        // ¿El policía TE ATRAVESÓ en la pista? (victoria inmediata del fugitivo)
+        // Un atravesamiento real = el policía, yendo en la misma dirección (+1), pasa de
+        // estar DETRÁS del jugador a quedar DELANTE / en su posición (cruza su índice).
+        // Se rastrea el cruce con prevDP. No se da la vuelta completa entre ambos estados.
+        function policiaOvertook(playerIdx, dt) {
+            var n = roadPts.length;
+            for (var oi = 0; oi < bots.length; oi++) {
+                var ob = bots[oi];
+                // Solo aplica cuando el policía va sobre la vía principal persiguiendo;
+                // en un desvío el índice local no es comparable con el del trazado.
+                if (!ob.isPolice || ob.segIdx !== 0 || ob.curDir !== 1) {
+                    if (ob.isPolice) ob.prevDP = null;   // reiniciar rastreador si no va en +1
+                    continue;
+                }
+                // Requisito físico: el policía debe haber ALCANZADO al jugador (estar encima).
+                // Evita falsos rebases por el cruce del índice 0 (vuelta completa) al arrancar.
+                if (botDistToPlayer(ob) > 16) { ob.prevDP = null; continue; }
+                // Distancia por la vía desde el policía hasta el jugador en +1
+                var dp = (ob.idx - playerIdx + n) % n;
+                if (ob.prevDP === null) { ob.prevDP = dp; continue; }
+                var prev = ob.prevDP;
+                ob.prevDP = dp;
+                // Cruce: antes estaba DETRÁS (dp grande, más de media vuelta) y ahora pasó
+                // a estar justo delante o en la posición del jugador (dp pequeño).
+                // El salto sólo puede venir de cruzar al jugador, no de dar la vuelta.
+                if (prev > n * 0.6 && dp < n * 0.2) return true;
+            }
+            return false;
+        }
+
+        // Metro distancia jugador-fugitivo (para HUD)
+        function playerToBotDist(b) {
+            return botDistToPlayer(b);
+        }
+
+        // Predicción de la futura posición del jugador sobre la vía (intercepción)
+        function predictPlayerRoadIdx(predTime) {
+            var px = car.position.x + carState.velocity.x * predTime;
+            var pz = car.position.z + carState.velocity.z * predTime;
+            return nearestRoadIdx(px, pz);
+        }
+
+        function updateBots(dt) {
+            if (!gameStarted || !car) return;
+            var n = roadPts.length;
+            var totalLen = roadCurve.getLength();
+            var ptsPerUnit = n / totalLen;
+            var diff = DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal;
+            var playerIdx = nearestRoadIdx(car.position.x, car.position.z);
+
+            // Detección de perseguidores activos
+            var anyInRange = false;
+            var minPoliceDist = Infinity;
+            for (var id = 0; id < bots.length; id++) {
+                var b = bots[id];
+                var dist = botDistToPlayer(b);
+                if (b.isPolice) {
+                    if (dist < minPoliceDist) minPoliceDist = dist;
+                    if (dist < diff.detect) anyInRange = true;
+                }
+            }
+
+            // ---- Estados / feed / logica de persecución (FUGITIVO) ----
+            if (gameMode === 'fugitivo') {
+                // En fugitivo el policía SIEMPRE te persigue (persecución persistente).
+                chase.active = true;
+                // VICTORIA INMEDIATA si el policía TE REBASA (te adelanta en la pista):
+                // el policía va en la misma dirección (+1) y su índice sobrepasa al del jugador.
+                if (policiaOvertook(playerIdx, dt)) {
+                    feedText('🚨 ¡EL POLICÍA TE ALCANZÓ Y TE REBASÓ!', '#ff6b6b');
+                    runStats.alertLevel = 4;
+                    chaseWon = false;   // te atraparon/rebasaron → DERROTA
+                    showResultScreen();
+                    return;
+                }
+                // CAPTURA física: la policía quedó pegada a ti un instante → DERROTA
+                if (minPoliceDist < 13) {
+                    chase.catchTimer += dt;
+                    if (chase.catchTimer > 0.3) {
+                        feedText('🚨 ¡LA POLICÍA TE ALCANZÓ!', '#ff6b6b');
+                        runStats.alertLevel = 4;
+                        chaseWon = false;
+                        showResultScreen();
+                        return;
+                    }
+                } else {
+                    chase.catchTimer = Math.max(0, chase.catchTimer - dt * 2);
+                }
+                if (minPoliceDist < diff.detect) {
+                    // El policía aún te tiene al alcance
+                    chase.lostTimer = 0;
+                    chase.escapeAccum = 0;
+                } else {
+                    // El policía perdió el rastro temporalmente
+                    chase.lostTimer += dt;
+                    if (chase.lostTimer > 1.5 && chase.lostTimer - dt < 1.5) {
+                        feedText('⚠️ POLICÍA PERDIENDO CONTACTO', '#fbbf24');
+                    }
+                    // Escape REAL: el policía quedó muy lejos y no te encuentra → VICTORIA
+                    if (chase.lostTimer > 4.0) {
+                        feedText('🟢 POLICÍA HA PERDIDO AL FUGITIVO', '#4ade80');
+                        runStats.policeEvaded++;
+                        chaseBeepToggle();
+                        chaseWon = true;
+                        runStats.alertLevel = chase.alertLevel || 1;
+                        showResultScreen();
+                        return;
+                    }
+                }
+            } else if (gameMode === 'policia') {
+                // El jugador persigue al fugitivo (bot)
+                var fug = fugitiveCars();
+                if (fug.length) {
+                    var fd = botDistToPlayer(fug[0]);
+                    if (!chase.active && fd < 900) { chase.active = true; feedText('🚨 PERSECUCIÓN ACTIVA', '#ff6b6b'); chaseBeepToggle(); }
+                    if (chase.active && fd < 26) {
+                        chase.detAccum += dt;
+                        if (chase.detAccum > 2.8) {
+                            showResultScreen(); // detennido
+                            return;
+                        }
+                    } else {
+                        chase.detAccum = Math.max(0, chase.detAccum - dt * 0.5);
+                    }
+                }
+            }
+
+            // ---- Sirenas de los policías (se encienden al perseguir) ----
+            for (var sbi = 0; sbi < bots.length; sbi++) {
+                var sb = bots[sbi];
+                if (!sb.isPolice) continue;
+                var wantSiren = chase.active;
+                sb.sirenOn = wantSiren;
+                var sl = sb.group.userData.sirenLight;
+                if (sl) {
+                    if (sb.sirenOn) {
+                        sb.sirenElapsed += dt;
+                        var cyc = sb.sirenElapsed % 2.0;
+                        sl.color.setHex(cyc < 1.0 ? 0xff2222 : 0x2266ff);
+                        sl.intensity = 3.5;
+                    } else {
+                        sl.intensity = 0;
+                    }
+                }
+            }
+
+            // =====================
+            //      MOVIMIENTO DE CADA BOT (por el grafo de carreteras)
+            //  El policía usa enrutamiento: se mueve por la vía principal Y entra a
+            //  los desvíos para perseguirte por la ruta más corta por asfalto.
+            //  El fugitivo (en modo policía) solo avanza por la vía principal.
+            // =====================
+            for (var bi = 0; bi < bots.length; bi++) {
+                var b = bots[bi];
+                if (b.turnTimer > 0) b.turnTimer -= dt;
+
+                // ---------- Elección de ruta ----------
+                var isChasePolice = b.isPolice;   // policía → persigue usando el grafo
+                var hop = null;
+                if (isChasePolice) {
+                    // Localización actual del bot y del jugador en la red de carreteras
+                    var bobLoc = locOf(b.x, b.z);
+                    var playLoc = locOf(car.position.x, car.position.z);
+                    // Recalcular el plan si: no existe, quedó agotado, o cambió el
+                    // segmento del bot o el del jugador.
+                    var wantReplan = !b.plan || b.planStep >= b.plan.length ||
+                        b.planPKey === undefined ||
+                        b.planPKey !== playLoc.seg;
+                    if (wantReplan) {
+                        if (bobLoc.seg === playLoc.seg) {
+                            // mismo segmento: perseguir directamente (sin pasar por grafo)
+                            b.plan = [{ seg: bobLoc.seg, entry: bobLoc.idx, exit: playLoc.idx, dir: (bobLoc.seg === 0) ? mainDirBetween(bobLoc.idx, playLoc.idx) : (playLoc.idx >= bobLoc.idx ? 1 : -1) }];
+                            b.planStep = 0;
+                            b.planPKey = playLoc.seg;
+                            b.routing = false;
+                        } else {
+                            var plan = planRoute(bobLoc, playLoc);
+                            if (plan && plan.length) {
+                                b.plan = plan;
+                                b.planStep = 0;
+                                b.planPKey = playLoc.seg;
+                                b.routing = true;
+                            } else {
+                                b.plan = null;
+                                b.routing = false;
+                            }
+                        }
+                    }
+                    if (b.plan && b.planStep < b.plan.length) hop = b.plan[b.planStep];
+                    if (!hop && b.plan === null) {
+                        // Sin ruta válida: seguir avanzando en la vía si estamos en ella
+                        hop = (bobLoc.seg === 0)
+                            ? { seg: 0, entry: b.idx, exit: playLoc.idx, dir: 1 }
+                            : null;
+                    }
+                }
+
+                if (!hop) {
+                    // Fugitivo (no policía) o sine ruta: avanzar adelante en la vía principal.
+                    var sf = segments[0];
+                    var pf = roadPts.length, perU = n / totalLen;
+                    // velocidad objetivo de huida
+                    var tf = diff.maxSpeed * 0.9;
+                    b.speed += Math.min(tf - b.speed, 26 * dt);
+                    b.speed = Math.max(0, b.speed);
+                    b.idx = b.idx + 1 * Math.max(1, b.speed) * perU * dt;
+                    var mfi = ((Math.floor(b.idx) % pf) + pf) % pf;
+                    var p0f = roadPts[mfi];
+                    var p1f = roadPts[(mfi + 1) % pf];
+                    var frf = b.idx - Math.floor(b.idx);
+                    b.x = p0f.x + (p1f.x - p0f.x) * frf;
+                    b.z = p0f.z + (p1f.z - p0f.z) * frf;
+                    b.group.position.set(b.x, terrainHeight(b.x, b.z), b.z);
+                    var ttF = roadCurve.getTangent((b.idx / (pf - 1)) % 1);
+                    b.heading += THREE.MathUtils.clamp(Math.atan2(ttF.x, ttF.z) - b.heading, -3 * dt, 3 * dt);
+                    b.group.rotation.y = b.heading;
+                    b.segIdx = 0;
+                    continue;
+                }
+
+                // ---------- Seguir el tramo (hop) ----------
+                var hoSeg = segments[hop.seg];
+                var hoPts = hoSeg.pts;
+                var hoM = hoPts.length;
+                var worldLen = (hop.seg === 0) ? totalLen : segDist(hoPts, 0, hoM - 1);
+                var perU = hoM / worldLen;   // pts por unidad de mundo
+                var hoDir = hop.dir;
+                var targetIdx = hop.exit;
+                if (hop.seg !== 0) {
+                    // no permite dar la vuelta en un desvío por el extremo; clampa
+                    targetIdx = Math.max(0, Math.min(hoM - 1, targetIdx));
+                }
+
+                // ----- Control de velocidad -----
+                var lookAheadC = 4;
+                var curv = 0;
+                var bR = Math.floor(b.idx);
+                for (var li = 1; li <= lookAheadC; li++) {
+                    var ci;
+                    if (hop.seg === 0) ci = ((bR + hoDir * li) % hoM + hoM) % hoM;
+                    else ci = Math.max(0, Math.min(hoM - 1, bR + hoDir * li));
+                    curv = Math.max(curv, trackCurvatureOn(hop.seg, ci));
+                }
+                var safeSpeed = diff.maxSpeed / (1 + curv * 12);
+                safeSpeed = Math.max(diff.maxSpeed * 0.55, Math.min(diff.maxSpeed, safeSpeed));
+
+                var pursuing = isChasePolice;
+                var targetSpeed = pursuing ? (diff.chaseSpeed + b.noise) : diff.maxSpeed * 0.45;
+                if (b.isPolice) {
+                    var physDist = botDistToPlayer(b);
+                    if (physDist < 12) targetSpeed = 4 + physDist * 1.2;
+                }
+                targetSpeed = Math.min(targetSpeed, safeSpeed);
+
+                var accel = (b.isPolice ? 60 : 26) * dt, brake = 60 * dt;
+                if (b.speed < targetSpeed) b.speed += Math.min(targetSpeed - b.speed, accel);
+                else b.speed -= Math.min(b.speed - targetSpeed, brake);
+                b.speed = Math.max(0, b.speed);
+
+                // ----- Integración a lo largo del segmento -----
+                var clamped = false;
+                var step = b.speed * perU * dt;   // pts recorridos este frame
+                if (hop.seg === 0) {
+                    // Tramo circular (vía principal): la llegada se detecta por la distancia
+                    // DIRECCIONAL restante hasta el exit, no por comparación entera (que se
+                    // rompe al cruzar el punto de cierre, p.ej. ir de 1342 hacia 0 en +1).
+                    var remain = (hoDir > 0)
+                        ? ((targetIdx - b.idx + hoM) % hoM)
+                        : ((b.idx - targetIdx + hoM) % hoM);
+                    if (step >= remain) { b.idx = targetIdx; clamped = true; }
+                    else b.idx = ((b.idx + hoDir * step) % hoM + hoM) % hoM;
+                } else {
+                    // Tramo lineal (desvío): comparación directa, sin envolvente
+                    if (hoDir > 0) {
+                        b.idx = b.idx + step;
+                        if (b.idx >= targetIdx) { b.idx = targetIdx; clamped = true; }
+                    } else {
+                        b.idx = b.idx - step;
+                        if (b.idx <= targetIdx) { b.idx = targetIdx; clamped = true; }
+                    }
+                }
+
+                // ----- Posicionar y orientar -----
+                var ifl;
+                if (hop.seg === 0) ifl = ((Math.floor(b.idx) % hoM) + hoM) % hoM;
+                else ifl = Math.max(0, Math.min(hoM - 1, Math.floor(b.idx)));
+                var p0 = hoPts[ifl];
+                var p1 = hoPts[(ifl + 1) % hoM];
+                var fr = b.idx - Math.floor(b.idx);
+                var ix = p0.x + (p1.x - p0.x) * fr;
+                var iz = p0.z + (p1.z - p0.z) * fr;
+                var ttan;
+                if (hop.seg === 0) ttan = roadCurve.getTangent((b.idx / (hoM - 1)) % 1);
+                else {
+                    var pa = hoPts[Math.min(ifl + 1, hoM - 1)], pb = hoPts[Math.max(ifl - 1, 0)];
+                    ttan = new THREE.Vector3(pa.x - pb.x, 0, pa.z - pb.z).normalize();
+                }
+                var gy = terrainHeight(ix, iz);
+                var perp = new THREE.Vector3(-ttan.z, 0, ttan.x);
+                var lateral = (b.laneOffset !== undefined ? b.laneOffset : 0);
+                b.group.position.set(ix + perp.x * lateral, gy, iz + perp.z * lateral);
+                b.x = b.group.position.x;
+                b.z = b.group.position.z;
+                b.segIdx = hop.seg;
+                b.signedSpeed = hoDir * b.speed;
+
+                // ----- Orientación (suave) -----
+                var targetHeading = hoDir > 0 ? Math.atan2(ttan.x, ttan.z) : Math.atan2(-ttan.x, -ttan.z);
+                var dh = targetHeading - b.heading;
+                while (dh > Math.PI) dh -= 2 * Math.PI;
+                while (dh < -Math.PI) dh += 2 * Math.PI;
+                var maxTurn = 1.8 + Math.min(b.speed / 30, 1) * 0.6;
+                var turnStep = maxTurn * dt;
+                b.heading += THREE.MathUtils.clamp(dh, -turnStep, turnStep);
+                b.group.rotation.y = b.heading;
+
+                // ----- Transición al siguiente tramo -----
+                if (clamped && isChasePolice && b.plan) {
+                    b.planStep++;
+                    if (b.planStep < b.plan.length) {
+                        // saltar al siguiente tramo
+                        var nextHop = b.plan[b.planStep];
+                        b.segIdx = nextHop.seg;
+                        b.idx = nextHop.entry;
+                        var ns = segments[nextHop.seg];
+                        var np = ns.pts;
+                        var nn = np.length;
+                        var ni = Math.max(0, Math.min(nn - 1, Math.floor(b.idx)));
+                        var pi = ns.pts[ni];
+                        b.group.position.set(pi.x, terrainHeight(pi.x, pi.z), pi.z);
+                        b.x = pi.x; b.z = pi.z;
+                    } else {
+                        b.plan = null;   // llegar al jugador → recomputar
+                    }
+                }
+            }
+
+            updateChaseUi(dt);
+        }
+
+        // ===== FÍSICA DE BOT (suave, equivalente al coche del jugador) =====
+        // (preparado para ampliar; la conducción actual está anclada a la vía)
+        function updateBotPhysics(b, dt, throttle, brake, steerInput, maxSpeed) {
+            var vx = b.vx, vz = b.vz;
+            var speed = Math.sqrt(vx * vx + vz * vz);
+            b.speed = speed;
+
+            var forward = new THREE.Vector3(Math.sin(b.heading), 0, Math.cos(b.heading));
+            var right = new THREE.Vector3(Math.cos(b.heading), 0, -Math.sin(b.heading));
+            var vLong = vx * forward.x + vz * forward.z;
+            var vLat = vx * right.x + vz * right.z;
+
+            // Dirección suavizada (inercia) -> sin giros bruscos
+            var targetSteer = steerInput * 0.55;
+            b.steerAngle += (targetSteer - b.steerAngle) * Math.min(dt * 4.5, 1);
+            var wheelAngle = b.steerAngle;
+
+            // Motor / freno
+            var Fx = 0;
+            if (throttle > 0) {
+                var sf = Math.max(0, 1 - speed / maxSpeed);
+                Fx += 13000 * throttle * sf;
+            }
+            if (brake > 0 && speed > 1.2) {
+                var bdec = 26000 * brake * dt;
+                var bv = Math.min(Math.abs(vLong), bdec);
+                Fx -= Math.sign(vLong || 1) * bv * 1000 / dt;
+            }
+
+            // Arrastre ligero (biblioteca/carretera)
+            var drag = 0.6 * speed * speed + 2.2 * speed;
+
+            // Freno extra sobre el pasto (igual que el coche del jugador)
+            if (typeof roadCurve !== 'undefined') {
+                closestOnCurve(b.x, b.z, nearCurve);
+                var gdx2 = b.x - nearCurve.x;
+                var gdz2 = b.z - nearCurve.z;
+                if (Math.sqrt(gdx2 * gdx2 + gdz2 * gdz2) > ROAD_W / 2 + 1.5) {
+                    drag += 500 + speed * 35;
+                }
+            }
+
+            // Fuerzas laterales (agarre) -> odómetro suave, estilo real
+            var slip = Math.atan2(vLat, Math.max(Math.abs(vLong), 0.5));
+            var mass = 1000;
+            var maxGrip = mass * 9.8 * 1.1;
+            var frontLat = THREE.MathUtils.clamp(wheelAngle * Math.min(speed, 15) * (mass * 0.32), -maxGrip, maxGrip);
+            var stabilize = -slip * Math.min(speed, 20) * (mass * 9);
+
+            var aLong = (Fx - drag) / mass;
+            vx += (forward.x * aLong + right.x * (frontLat + stabilize) / mass) * dt;
+            vz += (forward.z * aLong + right.z * (frontLat + stabilize) / mass) * dt;
+
+            // Yaw suavizado
+            var turnSpeed = Math.min(speed, 15);
+            var targetYaw = -wheelAngle * turnSpeed * 0.6 + (-slip) * 0.5;
+            b.yawRate += (targetYaw - b.yawRate) * Math.min(dt * 4.5, 1);
+            b.heading += b.yawRate * dt;
+
+            // Integrar posición
+            b.x += vx * dt;
+            b.z += vz * dt;
+            b.vx = vx; b.vz = vz;
+
+            // Anclar al suelo y colocar el grupo
+            var gy = terrainHeight(b.x, b.z) + 0.05;
+            b.group.position.set(b.x, gy, b.z);
+            b.group.rotation.y = b.heading;
+
+            // Mantener cerca de la vía (si el bot se va al pasto, el agarre ya lo frena; aquí lo corregimos suavemente re-proyectando)
+            nearestRoadIdx(b.x, b.z);
+        }
+
+        // Factor según la distancia del bot al jugador (afecta la predicción)
+        function distToPlayerFactor(b) {
+            var d = botDistToPlayer(b);
+            return Math.min(1, d / 300);
+        }
+
+        function updateChaseUi(dt) {
+            // pop-up de feedback con desvanecimiento
+            if (chase.detNotify > 0) {
+                chase.detNotify -= dt;
+                var el = document.getElementById('hudFeed');
+                if (chase.detNotify <= 0.6) el.style.opacity = Math.max(0, chase.detNotify / 0.6);
+                if (chase.detNotify <= 0) el.textContent = '';
+            }
+        }
+
+        // ===== HUD =====
+        function setupHud(mode) {
+            var left = document.getElementById('hudLeft');
+            var right = document.getElementById('hudRight');
+            var feed = document.getElementById('hudFeed');
+            feed.textContent = '';
+            feed.style.opacity = 0;
+            if (mode === 'libre') {
+                document.getElementById('hudLeftTitle').textContent = '🏎️ CONDUCCIÓN LIBRE';
+                document.getElementById('hudPolice').textContent = '—';
+                document.getElementById('hudDist').textContent = '0 m';
+                document.getElementById('hudTime').textContent = '00:00';
+                right.style.display = 'none';
+                left.style.display = '';
+            } else if (mode === 'fugitivo') {
+                document.getElementById('hudLeftTitle').textContent = '🚨 SER FUGITIVO';
+                document.getElementById('hudPolice').textContent = policeCars().length;
+                document.getElementById('hudDist').textContent = '0 m';
+                document.getElementById('hudTime').textContent = '00:00';
+                right.style.display = '';
+                document.getElementById('hudRightTitle').textContent = '🚨 ALERTA';
+                document.getElementById('hudAlertLevel').textContent = '1';
+                document.getElementById('hudAlertBar').style.width = '33%';
+            } else if (mode === 'online') {
+                document.getElementById('hudLeftTitle').textContent = onlineRole === 'policia' ? '🚓 ERES POLICÍA' : '🏎️ ERES FUGITIVO';
+                document.getElementById('hudPolice').textContent = 'RIVAL';
+                document.getElementById('hudDist').textContent = '0 m';
+                document.getElementById('hudTime').textContent = '00:00';
+                document.getElementById('hudRightTitle').textContent = onlineRole === 'policia' ? '💥 IMPACTOS' : '📍 RIVAL';
+                document.getElementById('hudAlertLevel').textContent = onlineRole === 'policia' ? '0/2' : '—';
+                document.getElementById('hudAlertBar').style.width = '0%';
+                right.style.display = '';
+                left.style.display = '';
+            } else if (mode === 'policia') {
+                document.getElementById('hudLeftTitle').textContent = '🚓 SER POLICÍA';
+                document.getElementById('hudPolice').textContent = fugitiveCars().length;
+                document.getElementById('hudDist').textContent = '0 m';
+                document.getElementById('hudTime').textContent = '00:00';
+                right.style.display = 'none';
+                left.style.display = '';
+            }
+        }
+
+        function updateHud(dt) {
+            if (!gameStarted || !car) return;
+            runStats.time += dt;
+            var kmh = Math.abs(carState.speed) * 3.6;
+            runStats.topSpeedKmh = Math.max(runStats.topSpeedKmh, kmh);
+            document.getElementById('hudSpeed').textContent = Math.round(kmh);
+            document.getElementById('hudGear').textContent = 'Marcha ' + currentGear + ' · RPM ' + Math.round(1000 + Math.abs(carState.speed) * 20);
+
+            // Distancia recorrida
+            var dx = car.position.x - runStats.lastPos.x;
+            var dz = car.position.z - runStats.lastPos.z;
+            runStats.dist += Math.sqrt(dx * dx + dz * dz);
+            runStats.lastPos.set(car.position.x, 0, car.position.z);
+            document.getElementById('hudDist').textContent = Math.round(runStats.dist) + ' m';
+
+            var mins = Math.floor(runStats.time / 60);
+            var secs = Math.floor(runStats.time % 60);
+            document.getElementById('hudTime').textContent =
+                (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+            // Contador de policías / fugitivos según el modo
+            if (gameMode === 'fugitivo') {
+                document.getElementById('hudPolice').textContent = policeCars().length;
+                // Nivel de alerta escalable según la cercanía del policía al jugador
+                var md = Infinity;
+                for (var pi2 = 0; pi2 < bots.length; pi2++) {
+                    if (bots[pi2].isPolice) {
+                        var dd2 = botDistToPlayer(bots[pi2]);
+                        if (dd2 < md) md = dd2;
+                    }
+                }
+                var lvl, pct, color;
+                if (md < 60)       { lvl = 4; pct = 100; color = '#ff3b3b'; }
+                else if (md < 140) { lvl = 3; pct = 72;  color = '#ff6b2b'; }
+                else if (md < 260) { lvl = 2; pct = 50;  color = '#fbbf24'; }
+                else               { lvl = 1; pct = 33;  color = '#4ade80'; }
+                if (lvl > chase.alertLevel) chase.alertLevel = lvl;
+                document.getElementById('hudAlertLevel').textContent = lvl;
+                var ab = document.getElementById('hudAlertBar');
+                ab.style.width = pct + '%';
+                ab.style.background = color;
+            } else if (gameMode === 'policia') {
+                document.getElementById('hudPolice').textContent = fugitiveCars().length;
+            } else if (gameMode === 'online') {
+                var oppCount = Object.keys(onlineOpps).length;
+                if (onlineRole === 'policia') {
+                    // El policía gana por choques: muestra el contador de impactos
+                    document.getElementById('hudPolice').textContent = oppCount;
+                    document.getElementById('hudRightTitle').textContent = '💥 IMPACTOS';
+                    document.getElementById('hudAlertLevel').textContent = onlineHits + '/2';
+                    var ob2 = document.getElementById('hudAlertBar');
+                    ob2.style.width = Math.min(100, (onlineHits / 2) * 100) + '%';
+                    ob2.style.background = '#ff3b3b';
+                } else {
+                    // Fugitivo: distancia al policía más cercano
+                    var nd = nearestFugitiveDist();
+                    document.getElementById('hudPolice').textContent = (onlineRole === 'fugitivo') ? 'POLICÍA' : oppCount;
+                    document.getElementById('hudAlertLevel').textContent = nd !== null ? Math.round(nd) + ' m' : '—';
+                    var ob = document.getElementById('hudAlertBar');
+                    if (nd === null) { ob.style.width = '0%'; return; }
+                    var opct = Math.max(0, Math.min(100, 100 - (nd / 300) * 100));
+                    var ocol = nd < 60 ? '#ff3b3b' : (nd < 160 ? '#fbbf24' : '#4ade80');
+                    ob.style.width = opct + '%';
+                    ob.style.background = ocol;
+                }
+            }
+        }
+
+        // ===== Controles táctiles =====
+        document.querySelectorAll('#touch .tbtn').forEach(function (btn) {
+            var k = btn.getAttribute('data-k').toLowerCase();
+            var down = function (e) { e.preventDefault(); keys[k] = true; btn.classList.add('active'); };
+            var up = function (e) { e.preventDefault(); keys[k] = false; btn.classList.remove('active'); };
+            btn.addEventListener('touchstart', down, { passive: false });
+            btn.addEventListener('touchend', up, { passive: false });
+            btn.addEventListener('touchcancel', up, { passive: false });
+            btn.addEventListener('mousedown', down);
+            btn.addEventListener('mouseup', up);
+            btn.addEventListener('mouseleave', up);
+        });
+
+        var camMode = 1;
+        var camCount = 3;
+        var camNames = ['Seguimiento', 'Trasera', 'Capot'];
+        var camPos = new THREE.Vector3();
+        var camLook = new THREE.Vector3();
+        var fovBase = 50;
+
+        var camOrbit = 0;
+        var mouseDown = false;
+        var lastMouseX = 0;
+        var camDistance = 6;
+        var camHeight = 2.5;
+        var sirenOn = false;
+        var sirenElapsed = 0;
+        var sirenLights = [];
+        var sirenSpot = null;
+        var audioCtx = null;
+        var sirenOsc = null;
+        var sirenSub = null;
+        var sirenSubGain = null;
+        var sirenVibrato = null;
+        var sirenVibratoGain = null;
+        var sirenFilter = null;
+        var sirenGain = null;
+        var engineOsc = null;
+        var engineOsc2 = null;
+        var engineFilter = null;
+        var engineGain = null;
+        var currentGear = 1;
+        var gearShiftTimer = 0;
+        var lastEngineRpm = 0;
+
+        var posFilter = 0.08;
+        var lookFilter = 0.12;
+        var camSnap = true;
+
+        document.addEventListener('keydown', function (e) {
+            keys[e.key.toLowerCase()] = true;
+            var prevCam = camMode;
+            if (e.key === 'c' || e.key === 'C') { camMode = (camMode % camCount) + 1; }
+            if (e.key === '1') camMode = 1;
+            if (e.key === '2') camMode = 2;
+            if (e.key === '3') camMode = 3;
+            if (camMode !== prevCam && camMode !== 3) camSnap = true;
+            if ((e.key === 'f' || e.key === 'F') && sirenSpot) { sirenOn = !sirenOn; }
+        });
+        document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+
+        renderer.domElement.addEventListener('mousedown', function (e) {
+            if (e.button === 0) { mouseDown = true; lastMouseX = e.clientX; }
+        });
+        document.addEventListener('mouseup', function (e) { if (e.button === 0) mouseDown = false; });
+        document.addEventListener('mousemove', function (e) {
+            if (mouseDown && camMode === 1) {
+                var dx = e.clientX - lastMouseX;
+                camOrbit -= dx * 0.005;
+                lastMouseX = e.clientX;
+            }
+        });
+
+        renderer.domElement.addEventListener('dblclick', function () {
+            camOrbit = 0;
+            camera.position.set(0, 2.5, -6);
+        });
+
+        // ===== Carga de modelos =====
+        var loader = new THREE.GLTFLoader();
+        var carsToLoad = 2;
+        var carsLoadedOk = 0;
+        var loadFailed = false;
+
+        function preparePlayerModel(gltf) {
+            var model = gltf.scene.clone(true);
+            model.traverse(function (child) {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        child.material.emissive = new THREE.Color(0x151515);
+                        if (child.material.metalness !== undefined) {
+                            child.material.metalness = Math.min(child.material.metalness, 0.55);
+                        }
+                        if (child.material.roughness !== undefined) {
+                            child.material.roughness = Math.max(child.material.roughness, 0.35);
+                        }
+                    }
+                }
+            });
+
+            var box = new THREE.Box3().setFromObject(model);
+            var size = box.getSize(new THREE.Vector3());
+            var maxDim = Math.max(size.x, size.y, size.z);
+            var scale = 3 / maxDim;
+
+            model.rotation.y = Math.PI / 2;
+            model.scale.setScalar(scale);
+
+            var rotatedBox = new THREE.Box3().setFromObject(model);
+            var rotatedCenter = rotatedBox.getCenter(new THREE.Vector3());
+            model.position.x = -rotatedCenter.x;
+            model.position.y = -rotatedBox.min.y;
+            model.position.z = -rotatedCenter.z;
+            model.roofHeight = rotatedBox.max.y;
+            return model;
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            sirenFilter = audioCtx.createBiquadFilter();
+            sirenFilter.type = 'bandpass';
+            sirenFilter.frequency.value = 1200;
+            sirenFilter.Q.value = 1.5;
+            sirenOsc = audioCtx.createOscillator();
+            sirenOsc.type = 'sine';
+            sirenOsc.frequency.value = 800;
+            sirenOsc.connect(sirenFilter);
+            sirenGain = audioCtx.createGain();
+            sirenGain.gain.value = 0;
+            sirenFilter.connect(sirenGain);
+            sirenGain.connect(audioCtx.destination);
+            sirenOsc.start();
+
+            engineOsc = audioCtx.createOscillator();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.value = 40;
+            engineOsc2 = audioCtx.createOscillator();
+            engineOsc2.type = 'square';
+            engineOsc2.frequency.value = 80;
+            engineFilter = audioCtx.createBiquadFilter();
+            engineFilter.type = 'lowpass';
+            engineFilter.frequency.value = 800;
+            engineGain = audioCtx.createGain();
+            engineGain.gain.value = 0.0;
+            engineOsc.connect(engineFilter);
+            engineOsc2.connect(engineFilter);
+            engineFilter.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+            engineOsc.start();
+            engineOsc2.start();
+        }
+
+        // Silencia TODO el audio del juego (motor, sirena). Se usa al volver al menú
+        // para que no se escuche nada de la partida.
+        function silenceGameAudio() {
+            if (!audioCtx) return;
+            if (engineGain) engineGain.gain.value = 0;
+            if (sirenGain) sirenGain.gain.value = 0;
+        }
+
+        function onCarLoaded(key, gltf) {
+            carModels[key] = preparePlayerModel(gltf);
+            carsLoadedOk++;
+            if (carsLoadedOk >= carsToLoad) {
+                initAudio();
+                loadingEl.style.display = 'none';
+                enableMenuButtons();
+                console.log('Modelos cargados correctamente');
+            }
+        }
+
+        function onCarError() {
+            if (loadFailed) return;
+            loadFailed = true;
+            loadingEl.style.display = 'none';
+            errorEl.style.display = 'block';
+            errorEl.innerHTML = 'Error al cargar el modelo.<br>Asegurate de estar usando un servidor local.<br>Abri una terminal en esta carpeta y ejecuta:<br><br><code>python -m http.server 8000</code><br><br>Luego abri <a href="http://localhost:8000" style="color:#4fc3f7">http://localhost:8000</a>';
+        }
+
+        function onCarProgress(xhr) {
+            if (xhr.lengthComputable) {
+                var percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                loadingEl.textContent = 'Cargando modelo 3D... ' + percent + '%';
+            }
+        }
+
+        loader.load('carro_carreras.glb', function (gltf) { onCarLoaded('carreras', gltf); }, onCarProgress, onCarError);
+        loader.load('carro_policia.glb', function (gltf) { onCarLoaded('policia', gltf); }, onCarProgress, onCarError);
+
+        window.addEventListener('resize', function () {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        function updateVehiclePhysics(dt) {
+            var S = carState;
+            var V = S.velocity;
+            var cfg = VehicleConfig;
+
+            var speed = Math.sqrt(V.x * V.x + V.z * V.z);
+            S.speed = speed;
+
+            var forward = new THREE.Vector3(Math.sin(S.heading), 0, Math.cos(S.heading));
+            var right = new THREE.Vector3(Math.cos(S.heading), 0, -Math.sin(S.heading));
+
+            var vLong = V.x * forward.x + V.z * forward.z;
+            var vLat = V.x * right.x + V.z * right.z;
+
+            var throttle = 0;
+            if (keys['w']) throttle = 1;
+
+            var brake = keys['s'] ? 1 : 0;       // S = freno (frena primero, luego reversa)
+            var isDrifting = keys['shift'];
+            var steerInput = ((keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0));
+
+            var targetSteer = steerInput * cfg.maxSteering * (1 - Math.min(speed * 0.02, 0.8));
+            var s = Math.min(dt * cfg.steeringResponse, 1);
+            S.steerAngle += (targetSteer - S.steerAngle) * s;
+
+            var wheelAngle = S.steerAngle;
+
+            var Fx = 0;
+            var lateralForce = 0;
+
+            if (throttle > 0) {
+                var speedFactor = Math.max(0, 1 - speed / cfg.maxSpeed);
+                Fx += cfg.accelForce * throttle * speedFactor;
+            } else if (throttle < 0) {
+                Fx -= cfg.reverseForce * (-throttle);
+            }
+
+            if (brake > 0) {
+                if (speed > 1.5) {
+                    // Frenar mientras el carro va hacia adelante
+                    var brakeDecel = cfg.brakeForce * brake * dt;
+                    var brakeV = Math.min(Math.abs(vLong), brakeDecel);
+                    Fx -= Math.sign(vLong) * brakeV * cfg.mass / dt;
+                } else {
+                    // Casi parado: pasar a reversa
+                    Fx -= cfg.reverseForce * 0.5;
+                }
+            }
+
+            var slipAngle = Math.atan2(vLat, Math.max(Math.abs(vLong), 0.5));
+
+            var downforce = 1 + speed * 0.02;
+            var maxGripF = cfg.mass * 9.8 * cfg.frontGrip * downforce;
+            var rearGripNow = isDrifting ? cfg.rearGrip * 0.6 : cfg.rearGrip;
+            var rearMaxF = cfg.mass * 9.8 * rearGripNow * downforce;
+
+            var driftFactor = isDrifting ? 0.55 : 1.0;
+
+            var frontLatRaw = wheelAngle * Math.min(speed, 15) * (cfg.mass * 0.35);            var lateralStabilize = -slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? 0.5 : 1.0);
+
+            frontLatRaw = THREE.MathUtils.clamp(frontLatRaw, -maxGripF, maxGripF);
+            var rearLatRaw = THREE.MathUtils.clamp(lateralStabilize, -rearMaxF, rearMaxF);
+
+            var drag = cfg.dragCoef * speed * speed * 0.5 + cfg.rollingCoef * speed;
+
+            // Detección de pasto (fuera de TODAS las carreteras: principal y desvíos).
+            // En el pasto el carro pierde velocidad con fuerza (muy lento), para que
+            // salirse de la vía sea costoso a alta velocidad.
+            var onGrass = false;
+            if (typeof roadCurve !== 'undefined') {
+                onGrass = !isOnAnyRoad(car.position.x, car.position.z);
+                if (onGrass) {
+                    // Frenado moderado: el pasto frena pero sin tumbar la velocidad de golpe
+                    drag += speed * cfg.mass * 0.45 + cfg.mass * 1.6;
+                }
+            }
+
+            var aLong = (Fx - drag) / cfg.mass;
+            var latF = frontLatRaw + rearLatRaw;
+
+            V.x += (forward.x * aLong + right.x * latF / cfg.mass) * dt;
+            V.z += (forward.z * aLong + right.z * latF / cfg.mass) * dt;
+
+            var turningSpeed = Math.min(speed, 15);
+            var steerStrength = isDrifting ? 0.7 : 0.6;
+            var yawFromSteer = -wheelAngle * turningSpeed * steerStrength;
+            var yawFromSlip = -slipAngle * cfg.frontGrip * (isDrifting ? 0.35 : 0.55);
+            var targetYaw = yawFromSteer + yawFromSlip;
+            S.yawRate += (targetYaw - S.yawRate) * Math.min(dt * 5.0, 1);
+            S.heading += S.yawRate * dt;
+
+            car.position.x += V.x * dt;
+            car.position.z += V.z * dt;
+
+            function groundHeightAt(px, pz) {
+                // Sobre asfalto (principal o desvíos) usa la altura de la vía; si no, la del terreno
+                if (isOnAnyRoad(px, pz)) {
+                    var ncgs = new THREE.Vector3();
+                    closestOnCurve(px, pz, ncgs);
+                    return ncgs.y + 0.05;
+                }
+                return terrainHeight(px, pz) + 0.05;
+            }
+
+            // Suelo sólido: el carro nunca baja de la superficie (corrección firme)
+            var groundY = groundHeightAt(car.position.x, car.position.z);
+            if (car.position.y < groundY) {
+                car.position.y = groundY;
+                if (V.y < 0) V.y = 0;
+            } else {
+                car.position.y += (groundY - car.position.y) * Math.min(dt * 4, 1);
+            }
+
+            // Colisión con árboles (usando distancia al cuadrado para rendimiento)
+            var carRadius = 1.6;
+            var hitTree = false;
+            for (var tc = 0; tc < treeColliders.length; tc++) {
+                var trd = treeColliders[tc];
+                var ddx = car.position.x - trd.x;
+                var ddz = car.position.z - trd.z;
+                var dist2 = ddx * ddx + ddz * ddz;
+                var minDist = carRadius + trd.r;
+                if (dist2 < minDist * minDist && dist2 > 0.000001) {
+                    hitTree = true;
+                    var dist = Math.sqrt(dist2);
+                    var pushX = ddx / dist;
+                    var pushZ = ddz / dist;
+                    car.position.x = trd.x + pushX * minDist;
+                    car.position.z = trd.z + pushZ * minDist;
+                    var dotV = V.x * pushX + V.z * pushZ;
+                    if (dotV < 0) {
+                        V.x -= pushX * dotV * 1.4;
+                        V.z -= pushZ * dotV * 1.4;
+                        speed *= 0.85;
+                    }
+                }
+            }
+
+            // Colisión con barreras de madera (destructibles: el carro las atraviesa)
+            for (var bw = 0; bw < barrierSegments.length; bw++) {
+                var seg = barrierSegments[bw];
+                if (seg.destroyed) continue;
+                var aX = seg.a.x, aZ = seg.a.z;
+                var bX = seg.b.x, bZ = seg.b.z;
+                var sdx = bX - aX, sdz = bZ - aZ;
+                var slen2 = sdx * sdx + sdz * sdz;
+                if (slen2 < 0.0001) continue;
+                var tT = ((car.position.x - aX) * sdx + (car.position.z - aZ) * sdz) / slen2;
+                tT = Math.max(0, Math.min(1, tT));
+                var cX = aX + sdx * tT;
+                var cZ = aZ + sdz * tT;
+                var bdx = car.position.x - cX;
+                var bdz = car.position.z - cZ;
+                var bdist = Math.sqrt(bdx * bdx + bdz * bdz);
+                var need = carRadius + 0.35;   // hitbox delgada (barrera visiblemente fina)
+                if (bdist < need) {
+                    // Destruir la barrera: el carro la atraviesa
+                    destroyBarrier(seg);
+                    // El carro cruza perdiendo un poco de velocidad (sin rebote ni empuje)
+                    speed *= 0.82;
+                    V.x *= 0.82;
+                    V.z *= 0.82;
+                }
+            }
+
+            // Colisión con los coches de otros jugadores (solo en modo multijugador): los
+            // carros chocan pero NO rebotan prácticamente — solo se despliegan
+            // para no atravesarse, manteniendo casi toda la velocidad.
+            if (gameMode === 'online') {
+                for (var osk in onlineOpps) {
+                    var oO = onlineOpps[osk];
+                    var oST = oO.state;
+                    if (!oST.has) continue;
+                    var ocdx = car.position.x - oST.cx;
+                    var ocdz = car.position.z - oST.cz;
+                    var ocDist2 = ocdx * ocdx + ocdz * ocdz;
+                    var ocMin = carRadius + 1.4;   // radio combinado de los dos coches
+                    if (ocDist2 < ocMin * ocMin && ocDist2 > 0.000001) {
+                        var ocDist = Math.sqrt(ocDist2);
+                        var ocNX = ocdx / ocDist;
+                        var ocNZ = ocdz / ocDist;
+                        // Separar al coche del jugador para que no atraviese al oponente (sin rebote)
+                        car.position.x = oST.cx + ocNX * ocMin;
+                        car.position.z = oST.cz + ocNZ * ocMin;
+                        // Sin rebote: conservar la velocidad casi intacta
+                        speed *= 0.97;
+                        // Empujar suavemente al oponente (local) para simular el choque a ambos lados
+                        oST.cx += ocNX * -1 * 4 * dt;
+                        oST.cz += ocNZ * -1 * 4 * dt;
+                        // Si el jugador ES el policía, contar un choque (2 choques = captura)
+                        if (onlineRole === 'policia' && onlineHitCooldown <= 0) {
+                            onlineHitCooldown = 1.2;   // enfriamiento: evita que un mismo empujón cuente varias veces
+                            onlineHits++;
+                            feedText('💥 ¡IMPACTO! Choques: ' + onlineHits + '/2', '#ffb84d');
+                        }
+                    }
+                }
+            }
+
+            if (onlineHitCooldown > 0) onlineHitCooldown -= dt;
+
+            var turnSmooth = 0.2 + Math.min(speed * 0.01, 0.1);
+            car.rotation.y = S.heading;
+            car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, 0, turnSmooth);
+
+            // Inclinación (pitch) según la pendiente real de la altura en la dirección de avance
+            var slopeSample = 1.0;
+            var hB = groundHeightAt(car.position.x - forward.x * slopeSample, car.position.z - forward.z * slopeSample);
+            var hF = groundHeightAt(car.position.x + forward.x * slopeSample, car.position.z + forward.z * slopeSample);
+            var slope = Math.atan2(hF - hB, 2 * slopeSample);
+            var targetPitch = -slope;
+            car.rotation.x = THREE.MathUtils.lerp(car.rotation.x, targetPitch, Math.min(dt * 4, 1));
+
+            for (var w = 0; w < wheels.front.length; w++) {
+                wheels.front[w].rotation.z = S.steerAngle;
+            }
+        }
+
+        function updateCamera(dt) {
+            var S = carState;
+            var speed = S.speed;
+
+            var camYaw = S.heading;
+            var desiredPos;
+            var desiredLook;
+            var fovTarget = fovBase;
+
+            if (camMode === 1) {
+                var orbit = camOrbit;
+                desiredPos = new THREE.Vector3(
+                    car.position.x - Math.sin(camYaw + orbit) * camDistance,
+                    car.position.y + camHeight,
+                    car.position.z - Math.cos(camYaw + orbit) * camDistance
+                );
+                desiredLook = new THREE.Vector3(
+                    car.position.x + Math.sin(camYaw) * 1.2,
+                    car.position.y + 0.8,
+                    car.position.z + Math.cos(camYaw) * 1.2
+                );
+                fovTarget = fovBase;
+                posFilter = 0.3;
+                lookFilter = 0.3;
+            } else if (camMode === 2) {
+                desiredPos = new THREE.Vector3(
+                    car.position.x - Math.sin(camYaw) * 8,
+                    car.position.y + 3.5,
+                    car.position.z - Math.cos(camYaw) * 8
+                );
+                desiredLook = new THREE.Vector3(
+                    car.position.x + Math.sin(camYaw) * 3,
+                    car.position.y,
+                    car.position.z + Math.cos(camYaw) * 3
+                );
+                fovTarget = fovBase;
+                posFilter = 0.3;
+                lookFilter = 0.3;
+            } else {
+                var camForward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
+                desiredPos = new THREE.Vector3(
+                    car.position.x - camForward.x * 0.1,
+                    car.position.y + 1.0,
+                    car.position.z - camForward.z * 0.1
+                );
+                desiredLook = new THREE.Vector3(
+                    car.position.x + camForward.x * 6,
+                    car.position.y + 0.6,
+                    car.position.z + camForward.z * 6
+                );
+                fovTarget = fovBase - 10;
+                posFilter = 0.35;
+                lookFilter = 0.35;
+            }
+
+            camera.fov += (fovTarget - camera.fov) * Math.min(dt * 6, 1);
+            camera.updateProjectionMatrix();
+
+            if (camMode === 3) {
+                camera.position.copy(desiredPos);
+                camera.lookAt(desiredLook);
+            } else {
+                if (!camPos.length() || camSnap) {
+                    camPos.copy(desiredPos);
+                    camLook.copy(desiredLook);
+                    camSnap = false;
+                }
+                camPos.lerp(desiredPos, posFilter);
+                camLook.lerp(desiredLook, lookFilter);
+                camera.position.copy(camPos);
+                camera.lookAt(camLook);
+            }
+
+            document.getElementById('info').textContent = camNames[camMode - 1] + ' | W adelante | A/D girar | S freno/reversa | Shift derrapar | F sirena | C cámara';
+        }
+
+        var lastTime = performance.now();
+        function animate() {
+            requestAnimationFrame(animate);
+            var now = performance.now();
+            var dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+
+            if (car && gameStarted) {
+                // Cuenta regresiva de inicio (3-2-1): el coche no se mueve hasta el ¡YA!
+                if (onlineCount > 0) {
+                    onlineCountT += dt;
+                    var disp = Math.ceil(3 - onlineCountT);
+                    if (disp < 1) disp = 1;
+                    if (disp !== onlineShown) {
+                        onlineShown = disp;
+                        onlineCountEl.style.display = 'block';
+                        onlineCountEl.textContent = disp;
+                        onlineCountEl.classList.remove('go');
+                        feedText('🚨 ¡PREPÁRATE!, en 3…2…1…', '#ffd270');
+                    }
+                    if (onlineCountT >= 3) {
+                        onlineCount = 0;
+                        onlineCountEl.classList.add('go');
+                        onlineCountEl.textContent = '¡YA!';
+                        feedText('🟢 ¡CORRE!', '#4ade80');
+                        setTimeout(function () { onlineCountEl.style.display = 'none'; }, 900);
+                    }
+                    // Mantener el coche en reposo durante la cuenta
+                    carState.velocity.set(0, 0, 0);
+                    carState.speed = 0;
+                    carState.yawRate = 0;
+                    if (gameMode === 'online') {
+                        updateHud(dt);
+                        updateCamera(dt);
+                        renderer.render(scene, camera);
+                    }
+                } else {
+                    updateVehiclePhysics(dt);
+                    if (gameMode !== 'online') {
+                        updateBots(dt);
+                    } else {
+                        updateOnlineOpp(dt);
+                        updateOnlineResult(dt);
+                        onlineSendAccum += dt;
+                        if (onlineSendAccum >= 0.05 && onlineWs && onlineWs.readyState === 1) {
+                            onlineSendAccum = 0;
+                            wsSend({ type: 'state', state: {
+                                x: car.position.x, z: car.position.z,
+                                heading: carState.heading, speed: carState.speed, role: onlineRole
+                            }});
+                        }
+                    }
+                    updateHud(dt);
+                    updateCamera(dt);
+                }
+
+                if (sirenOn) {
+                    sirenElapsed += dt;
+                    var cycle = sirenElapsed % 2.0;
+                    var phase = cycle < 1.0 ? 0 : 1;
+                    if (sirenSpot) {
+                        sirenSpot.color.setHex(phase === 0 ? 0xff2222 : 0x2266ff);
+                        sirenSpot.intensity = 3.5;
+                    }
+                    if (audioCtx && sirenOsc && sirenGain) {
+                        if (audioCtx.state === 'suspended') audioCtx.resume();
+                        sirenGain.gain.value = 0.3;
+                        var sirenCycle = sirenElapsed % 1.6;
+                        var wailFreq;
+                        if (sirenCycle < 0.8) {
+                            wailFreq = 500 + (900 - 500) * (sirenCycle / 0.8);
+                        } else {
+                            wailFreq = 900 - (900 - 500) * ((sirenCycle - 0.8) / 0.8);
+                        }
+                        sirenOsc.frequency.setTargetAtTime(wailFreq, audioCtx.currentTime, 0.03);
+                    }
+                } else {
+                    if (sirenSpot) sirenSpot.intensity = 0;
+                    if (audioCtx && sirenGain) sirenGain.gain.value = 0;
+                }
+
+                if (audioCtx && engineOsc && engineGain) {
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    var engineSpeed = Math.abs(carState.speed);
+                    var throttle = (keys['w'] ? 1 : 0) - (keys['s'] ? 0.4 : 0) * 0;
+
+                    var gearStep = [0, 11, 22, 33, 44, 55][Math.min(currentGear, 5)];
+                    var rpmBase = 500 + (engineSpeed + gearStep * 0) * 15;
+                    var rpmInGear = 500 + Math.max(0, engineSpeed - gearStep) * 30 + throttle * 800;
+
+                    if (gearShiftTimer > 0) {
+                        gearShiftTimer -= dt;
+                        rpmInGear = 700 + gearShiftTimer * 300;
+                        engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.02);
+                        engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.02);
+                    } else {
+                        if (throttle > 0 && rpmInGear > 4200 && currentGear < 5) {
+                            currentGear++;
+                            gearShiftTimer = 0.4;
+                        }
+                        if (throttle <= 0 && rpmInGear < 1500 && currentGear > 1) {
+                            currentGear--;
+                        }
+                        engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.05);
+                        engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.05);
+                    }
+
+                    engineFilter.frequency.setTargetAtTime(300 + rpmInGear, audioCtx.currentTime, 0.05);
+                    engineGain.gain.value = 0.005 + Math.min(engineSpeed * 0.0002, 0.01) + (throttle > 0 ? 0.003 : 0);
+                }
+            }
+
+            // La luz del carro lo sigue para que el modelo quede bien iluminado en todo ángulo
+            if (car) {
+                carLight.position.set(car.position.x, car.position.y + 8, car.position.z - 4);
+            }
+
+            // Actualizar partículas (astillas de las barreras destruidas)
+            if (woodParticles.length > 0) updateParticles(dt);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
