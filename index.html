@@ -2507,12 +2507,13 @@
                 if (o.label) o.label.position.set(O.cx, gy + 2.6, O.cz);
             }
         }
-        // Devuelve la distancia al fugitivo más cercano (o null si no hay)
-        function nearestFugitiveDist() {
+        // Devuelve la distancia al policía más cercano (o null si no hay).
+        // El fugitivo gana cuando se aleja mucho de TODOS los policías.
+        function nearestPoliceDist() {
             var best = null;
             for (var k in onlineOpps) {
                 var o = onlineOpps[k];
-                if (o.role === 'fugitivo') {
+                if (o.role === 'policia' && o.state && o.state.has) {
                     var dx = o.state.cx - car.position.x;
                     var dz = o.state.cz - car.position.z;
                     var d = Math.sqrt(dx * dx + dz * dz);
@@ -2530,8 +2531,8 @@
                     onlineFinish('policia');
                 }
             } else {
-                // Fugitivo: la partida acaba cuando se aleja bastante de TODOS los policías
-                var d = nearestFugitiveDist();
+                // Fugitivo: la partida acaba cuando se aleja bastante de TODOS los policías.
+                var d = nearestPoliceDist();
                 if (d !== null) {
                     if (d > 240) {
                         onlineEscapeAccum += dt;
@@ -3568,7 +3569,7 @@
                     ob2.style.background = '#ff3b3b';
                 } else {
                     // Fugitivo: distancia al policía más cercano
-                    var nd = nearestFugitiveDist();
+                    var nd = nearestPoliceDist();
                     document.getElementById('hudPolice').textContent = (onlineRole === 'fugitivo') ? 'POLICÍA' : oppCount;
                     document.getElementById('hudAlertLevel').textContent = nd !== null ? Math.round(nd) + ' m' : '—';
                     var ob = document.getElementById('hudAlertBar');
