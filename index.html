@@ -2057,8 +2057,8 @@
             try { localStorage.setItem('invasion_nick', playerNick); } catch (e) {}
         }
         var onlineWs = null;
-        var SB_URL = 'https://YOUR-PROJECT.supabase.co';   // TODO: fill user URL
-        var SB_ANON = 'eyJ...';                            // TODO: fill user anon key
+        var SB_URL = 'https://dcikioprmtstgowchhkq.supabase.co';
+        var SB_ANON = 'sb_publishable_tSwvg388y7iNnP6h9Co-MQ_2KaQqzTm';
         var sbClient = null;
         var sbChannel = null;
         var onlineIsCreator = false;
@@ -2200,7 +2200,7 @@
         }
         function onlineConnect(afterOpen) {
             if (!sbClient) {
-                sbClient = window.supabase.createClient(SB_URL, SB_ANON, { realtime: {} });
+                sbClient = SupabaseJS.createClient(SB_URL, SB_ANON);
             }
             if (afterOpen) afterOpen();
         }
@@ -4116,7 +4116,7 @@
                         updateOnlineOpp(dt);
                         updateOnlineResult(dt);
                         onlineSendAccum += dt;
-                        if (onlineSendAccum >= 0.05 && onlineWs && onlineWs.readyState === 1) {
+                        if (onlineSendAccum >= 0.05 && sbChannel) {
                             onlineSendAccum = 0;
                             wsSend({ type: 'state', state: {
                                 x: car.position.x, z: car.position.z,

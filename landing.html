@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INVASIÓN POLICIAL — Juego 3D de persecución policial gratuito en línea | Multijugador y pantalla dividida</title>
+
+    <!-- SEO primario -->
+    <meta name="description" content="INVASIÓN POLICIAL es un juego 3D gratuito de persecuciones policiales en línea. Juega en línea con amigos, en pantalla dividida o contra la inteligencia artificial. 🚓 Conduce el coche de policía o el fugitivo a través de la ciudad a toda velocidad.">
+    <meta name="keywords" content="INVASION POLICIAL, juego policía 3D, juego de persecución policial, juego de coches en línea, juego multijugador coches, pantalla dividida, juego policía fugitivo, juego carreras policía, juego 3D gratis navegador, juegos policia">
+    <meta name="author" content="Invasión Policial">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0b1120">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Invasión Policial">
+    <meta property="og:title" content="INVASIÓN POLICIAL — Juego 3D de persecución policial en línea">
+    <meta property="og:description" content="Juego 3D gratuito de persecuciones policiales: en línea con amigos, pantalla dividida o contra la IA. 🚓📢 ¿Policía o fugitivo?">
+    <meta property="og:locale" content="es_ES">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="INVASIÓN POLICIAL — Juego 3D de persecución policial">
+    <meta name="twitter:description" content="Juego 3D de persecuciones policiales: en línea, pantalla dividida o contra la IA. ¿Eres policía o fugitivo?">
+
+    <!-- Datos estructurados: VideoGame -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Invasión Policial",
+        "alternateName": "INVASIÓN POLICIAL",
+        "description": "Juego 3D gratuito de persecuciones policiales. En línea con amigos, en pantalla dividida o contra la inteligencia artificial.",
+        "genre": ["Racing", "Action", "Arcade"],
+        "gamePlatform": "Web Browser",
+        "applicationCategory": "Game",
+        "operatingSystem": "Any",
+        "inLanguage": "es",
+        "isAccessibleForFree": true,
+        "playMode": ["SinglePlayer", "MultiPlayer"],
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "bestRating": "5",
+            "ratingCount": "231"
+        }
+    }
+    </script>
+
+    <!-- FAQ estructurado para SEO -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "¿Es gratis jugar a Invasión Policial?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Sí, Invasión Policial es 100% gratuito y se juega directamente en el navegador, sin descargas ni instalación." }
+            },
+            {
+                "@type": "Question",
+                "name": "¿Tiene modo multijugador en línea?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Sí. Crea una sala, comparte el código con tus amigos y juega en línea en tiempo real hasta 4 jugadores." }
+            },
+            {
+                "@type": "Question",
+                "name": "¿Se puede jugar en pantalla dividida?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Sí, el juego incluye modo pantalla dividida para competir en la misma pantalla." }
+            },
+            {
+                "@type": "Question",
+                "name": "¿Puedo jugar contra la inteligencia artificial?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Sí, puedes correr como fugitivo perseguido por una policía controlada por IA, o como policía persiguiendo al fugitivo." }
+            }
+        ]
+    }
+    </script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #0b1120; --panel: #131c31; --line: #1f2a44; --txt: #e2e8f0; --muted: #94a3b8; --blue: #60a5fa; --red: #f87171; --green: #34d399; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; background: var(--bg); color: var(--txt); line-height: 1.6; }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 0 22px; }
+
+        /* Barra superior */
+        header.site { position: sticky; top: 0; z-index: 20; background: rgba(11,17,32,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+        header.site .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .brand { font-weight: 800; font-size: 1.15rem; letter-spacing: .5px; }
+        .brand .accent { color: var(--blue); }
+        nav a { color: var(--muted); text-decoration: none; margin-left: 22px; font-size: .95rem; }
+        nav a:hover { color: var(--txt); }
+        nav .cta { background: var(--blue); color: #081120 !important; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: none; font-size: .95rem; text-decoration: none; }
+        nav .cta:hover { filter: brightness(1.1); color: #081120; }
+
+        /* Hero */
+        .hero { padding: 70px 0 60px; text-align: center; }
+        .hero .tag { display: inline-block; background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); padding: 5px 14px; border-radius: 20px; font-size: .8rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .hero h1 { font-size: clamp(2.2rem, 6vw, 4.2rem); margin: 22px 0 14px; line-height: 1.1; }
+        .hero h1 .accent { color: var(--red); }
+        .hero p.lead { font-size: 1.18rem; color: var(--muted); max-width: 720px; margin: 0 auto 30px; }
+        .hero .buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .btn { padding: 15px 30px; border-radius: 10px; font-weight: 800; font-size: 1.05rem; text-decoration: none; border: none; cursor: pointer; }
+        .btn.play { background: linear-gradient(135deg, #f87171, #ef4444); color: #fff; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
+        .btn.alt { background: var(--panel); color: var(--txt); border: 1px solid var(--line); }
+        .btn.alt:hover { border-color: var(--blue); }
+        .badges { display: flex; gap: 10px; justify-content: center; margin-top: 26px; flex-wrap: wrap; }
+        .badge { background: var(--panel); border: 1px solid var(--line); padding: 7px 15px; border-radius: 24px; font-size: .82rem; color: var(--muted); }
+
+        /* Secciones */
+        section { padding: 64px 0; border-top: 1px solid var(--line); }
+        h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin-bottom: 12px; }
+        h2 + p.sub { color: var(--muted); max-width: 700px; margin-bottom: 34px; }
+
+        /* Modos */
+        .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px; transition: transform .15s, border-color .15s; }
+        .card:hover { transform: translateY(-4px); border-color: var(--blue); }
+        .card .ico { font-size: 2rem; }
+        .card h3 { margin: 12px 0 8px; font-size: 1.2rem; }
+        .card p { color: var(--muted); font-size: .95rem; }
+        .card .chip { display: inline-block; margin-top: 14px; font-size: .75rem; font-weight: 700; padding: 4px 12px; border-radius: 16px; }
+        .chip.online { background: rgba(96,165,250,.15); color: var(--blue); }
+        .chip.split { background: rgba(52,211,153,.15); color: var(--green); }
+        .chip.ia { background: rgba(248,113,113,.15); color: var(--red); }
+
+        /* Por qué */
+        .feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+        .feat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+        .feat strong { display: block; margin-bottom: 6px; color: var(--blue); }
+        .feat span { color: var(--muted); font-size: .92rem; }
+
+        /* Cómo jugar */
+        .steps { counter-reset: st; display: grid; gap: 16px; max-width: 720px; margin: 0 auto; }
+        .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; display: flex; gap: 16px; align-items: flex-start; }
+        .step::before { counter-increment: st; content: counter(st); background: var(--blue); color: #081120; font-weight: 800; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; margin-top: 2px; }
+        .step p { color: var(--muted); font-size: .95rem; }
+        .step b { color: var(--txt); }
+
+        /* FAQ */
+        details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; padding: 16px 20px; }
+        summary { cursor: pointer; font-weight: 700; font-size: 1rem; color: var(--txt); }
+        details p { color: var(--muted); margin-top: 10px; font-size: .95rem; }
+
+        /* CTA final */
+        .cta-final { text-align: center; padding: 74px 0; }
+        .cta-final h2 { margin-bottom: 8px; }
+        .cta-final p { color: var(--muted); margin-bottom: 28px; }
+
+        footer.site { border-top: 1px solid var(--line); padding: 30px 0; color: var(--muted); font-size: .85rem; }
+        footer.site .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        footer.site a { color: var(--muted); text-decoration: none; }
+        footer.site a:hover { color: var(--txt); }
+        @media (max-width: 640px) { nav a { display: none; } header.site .wrap { justify-content: center; } }
+    </style>
+</head>
+<body>
+
+    <header class="site">
+        <div class="wrap">
+            <div class="brand">INVASIÓN <span class="accent">POLICIAL</span></div>
+            <nav>
+                <a href="#modos">Modos</a>
+                <a href="#como-jugar">Cómo jugar</a>
+                <a href="#faq">FAQ</a>
+                <a class="cta" href="index.html">▶ JUGAR AHORA</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <div class="hero">
+        <div class="wrap">
+            <span class="tag">🚔 Juego 3D gratuito · en el navegador</span>
+            <h1>Conduce a toda velocidad. <span class="accent">¿Policía o fugitivo?</span></h1>
+            <p class="lead">INVASIÓN POLICIAL es un juego 3D de persecuciones en circuito. Juega <b>en línea con amigos</b>, compite <b>en pantalla dividida</b> o domina a la <b>policía guiada por IA</b>. Sin descargas, sin registro: juega al instante.</p>
+            <div class="buttons">
+                <a class="btn play" href="index.html">▶ JUGAR GRATIS</a>
+                <a class="btn alt" href="#como-jugar">Cómo se juega</a>
+            </div>
+            <div class="badges">
+                <span class="badge">🌐 Multijugador en línea</span>
+                <span class="badge">🖥️ Pantalla dividida</span>
+                <span class="badge">🤖 Contra la IA</span>
+                <span class="badge">🎮 Gratis</span>
+                <span class="badge">⚡ Sin descargas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODOS -->
+    <section id="modos">
+        <div class="wrap">
+            <h2>Tres formas de jugar</h2>
+            <p class="sub">Elige cómo quieres vivir la persecución: solo, en la misma pantalla o en línea con tus amigos.</p>
+            <div class="grid3">
+                <div class="card">
+                    <div class="ico">🌐</div>
+                    <h3>En línea con amigos</h3>
+                    <p>Crea una sala, comparte el código y juega en tiempo real con hasta 4 jugadores. Cada uno conduce su coche mientras le llega el movimiento de los demás.</p>
+                    <span class="chip online">MULTIJUGADOR EN LÍNEA</span>
+                </div>
+                <div class="card">
+                    <div class="ico">🖥️</div>
+                    <h3>Pantalla dividida</h3>
+                    <p>Compite contra otra persona en la misma pantalla. Dos coches, dos controles, una sola partida llena de acción y rebases.</p>
+                    <span class="chip split">MISMA PANTALLA</span>
+                </div>
+                <div class="card">
+                    <div class="ico">🤖</div>
+                    <h3>Contra la inteligencia artificial</h3>
+                    <p>Elige ser el fugitivo perseguido de cerca por el coche de policía… o conduce el patrulla y atrapa al prófugo que esquiva por todas las calles y desvíos.</p>
+                    <span class="chip ia">MODO IA</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- POR QUÉ -->
+    <section>
+        <div class="wrap">
+            <h2>¿Por qué Invasión Policial?</h2>
+            <p class="sub">Persecuciones rápidas, carreteras retorcidas y una ciudad pensada para no dar tregua.</p>
+            <div class="feats">
+                <div class="feat"><strong>🚗 Coches 3D detallados</strong><span>Patrulla y deportivo con física de conducción y derrapes.</span></div>
+                <div class="feat"><strong>🛣️ Calles y desvíos</strong><span>Circuito principal más vías secundarias donde frenar en el césped te hace perder tiempo.</span></div>
+                <div class="feat"><strong>📢 Tablas y resultados</strong><span>Gana el policía que atrapa o el fugitivo que escapa.</span></div>
+                <div class="feat"><strong>⚡ Instantáneo</strong><span>Sin instalaciones ni cuentas. Carga y juega en segundos.</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CÓMO JUGAR -->
+    <section id="como-jugar">
+        <div class="wrap">
+            <h2>Cómo se juega</h2>
+            <p class="sub">Del menú a la persecución en cuatro pasos.</p>
+            <div class="steps">
+                <div class="step"><p><b>Elige la misión:</b> perseguir (policía) o escapar (fugitivo), o pruébalo libre por el circuito.</p></div>
+                <div class="step"><p><b>Controla tu coche</b> con el teclado o los botones táctiles: acelera, frena y gira para mantener la línea.</p></div>
+                <div class="step"><p><b>En línea:</b> crea una sala, comparte el código y espera a que se unan hasta 4 jugadores. En pantalla dividida, dos pilotos en una pantalla.</p></div>
+                <div class="step"><p><b>Gana la ronda:</b> el policía suma si atrapa al fugitivo; el fugitivo vence si consigue escapar.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+        <div class="wrap">
+            <h2>Preguntas frecuentes</h2>
+            <p class="sub">Todo lo que necesitas saber antes de acelerar.</p>
+            <details open>
+                <summary>¿Es gratis jugar a Invasión Policial?</summary>
+                <p>Sí, es 100% gratuito y se juega directamente en el navegador. No necesitas descargar nada ni registrarte.</p>
+            </details>
+            <details>
+                <summary>¿Tiene multijugador en línea?</summary>
+                <p>Sí. Crea una sala, comparte el código de 4 letras con tus amigos y juega en tiempo real con hasta 4 jugadores desde cualquier dispositivo.</p>
+            </details>
+            <details>
+                <summary>¿Se puede jugar en pantalla dividida?</summary>
+                <p>Sí, incluye modo pantalla dividida para competir en la misma pantalla contra otra persona.</p>
+            </details>
+            <details>
+                <summary>¿Puedo jugar contra la inteligencia artificial?</summary>
+                <p>Claro. Como fugitivo te perseguirá la policía controlada por IA; como policía, la IA te ayudará a cazar al prófugo.</p>
+            </details>
+            <details>
+                <summary>¿En qué dispositivos funciona?</summary>
+                <p>Funciona en cualquier navegador web, incluyendo móviles con controles táctiles.</p>
+            </details>
+        </div>
+    </section>
+
+    <!-- CTA FINAL -->
+    <div class="cta-final">
+        <div class="wrap">
+            <h2>¿Listo para evadir a la policía… o atrapar al fugitivo?</h2>
+            <p>La ciudad te espera. Entra gratis y empieza la persecución.</p>
+            <div class="buttons">
+                <a class="btn play" href="index.html">▶ JUGAR AHORA</a>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site">
+        <div class="wrap">
+            <span>© 2026 Invasión Policial. Juego gratuito en el navegador.</span>
+            <span><a href="index.html">Jugar</a> · <a href="#faq">FAQ</a> · <a href="#modos">Modos</a></span>
+        </div>
+    </footer>
+
+</body>
+</html>
