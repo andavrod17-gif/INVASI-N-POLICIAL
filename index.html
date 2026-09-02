@@ -1837,6 +1837,8 @@
             mass: 1000,
             enginePower: 250,
             maxSpeed: 70,
+            maxReverseSpeed: 18,
+            engineBraking: 2.6,
             accelForce: 11000,
             brakeForce: 18,
             reverseForce: 6000,
@@ -3809,21 +3811,33 @@
             var Fx = 0;
             var lateralForce = 0;
 
+            // ===== CONTROL DE VELOCIDAD LONGITUDINAL (adelante y marcha atrás) =====
+            // Dirección en la que el carro está avanzando actualmente:
+            //   vLong > 0  → hacia adelante (heading)
+            //   vLong < 0  → marcha atrás (retrocediendo)
+            // Fr:             aceleración de adelante ("w")
+            // S:              primero frena, y si está casi parado pasa a marcha atrás
+
             if (throttle > 0) {
+                // Acelerar / ir hacia adelante. Si hoy voy en reversa, "w" frena la reversa
+                // y luego acelera adelante (misma lógica, pero con signo correcto).
                 var speedFactor = Math.max(0, 1 - speed / cfg.maxSpeed);
                 Fx += cfg.accelForce * throttle * speedFactor;
-            } else if (throttle < 0) {
-                Fx -= cfg.reverseForce * (-throttle);
             }
 
             if (brake > 0) {
-                if (speed > 1.5) {
-                    // Frenar mientras el carro va hacia adelante
-                    var brakeDecel = cfg.brakeForce * brake * dt;
-                    var brakeV = Math.min(Math.abs(vLong), brakeDecel);
-                    Fx -= Math.sign(vLong) * brakeV * cfg.mass / dt;
+                if (vLong > 1.5) {
+                    // Voy hacia adelante: frenar el avance (freno)
+                    var brakeDecel = cfg.brakeForce * brake;
+                    var brakeDelta = Math.min(Math.abs(vLong), brakeDecel * dt);
+                    V.x -= forward.x * brakeDelta;
+                    V.z -= forward.z * brakeDelta;
+                } else if (vLong < -1.5) {
+                    // Voy en marcha atrás por encima de la velocidad mínima de reversa:
+                    // "s" mantiene la reversa (empuje controlado) con límite de velocidad.
+                    Fx -= cfg.reverseForce * 0.35;
                 } else {
-                    // Casi parado: pasar a reversa
+                    // Casi parado: iniciar la marcha atrás con fuerza moderada y tope.
                     Fx -= cfg.reverseForce * 0.5;
                 }
             }
@@ -3843,6 +3857,11 @@
             var rearLatRaw = THREE.MathUtils.clamp(lateralStabilize, -rearMaxF, rearMaxF);
 
             var drag = cfg.dragCoef * speed * speed * 0.5 + cfg.rollingCoef * speed;
+            // Frenado natural del motor: al soltar TODAS las entradas de motor (ni "w" ni "s"),
+            // el carro decelera de forma perceptible en vez de rodar indefinidamente.
+            if (throttle <= 0 && brake <= 0) {
+                drag += cfg.mass * cfg.engineBraking;
+            }
 
             // Detección de pasto (fuera de TODAS las carreteras: principal y desvíos).
             // En el pasto el carro pierde velocidad con fuerza (muy lento), para que
@@ -3856,11 +3875,33 @@
                 }
             }
 
-            var aLong = (Fx - drag) / cfg.mass;
+            // El motor (Fx) se aplica a lo largo del "forward" (adelante o reversa);
+            // las fuerzas laterales a lo largo de "right".
+            var aLong = Fx / cfg.mass;
             var latF = frontLatRaw + rearLatRaw;
 
             V.x += (forward.x * aLong + right.x * latF / cfg.mass) * dt;
             V.z += (forward.z * aLong + right.z * latF / cfg.mass) * dt;
+
+            // Fricción / arrastre VECTORIAL: se opone a la velocidad real (V),
+            // no a la dirección "forward". Así frena tanto el avance como la
+            // marcha atrás, evitando que el carro acelere sin tope al rodar atrás.
+            if (speed > 0.001) {
+                var dragAcc = (drag / cfg.mass) * dt;
+                var dL = Math.min(speed, dragAcc);
+                var invD = dL / speed;
+                V.x -= V.x * invD;
+                V.z -= V.z * invD;
+                speed -= dL;
+            }
+
+            // Tope duro de velocidad en marcha atrás: límite de seguridad duro.
+            var vLc = V.x * forward.x + V.z * forward.z;
+            if (vLc < -cfg.maxReverseSpeed) {
+                var over = vLc + cfg.maxReverseSpeed;   // (negativo) exceso
+                V.x -= forward.x * over;
+                V.z -= forward.z * over;
+            }
 
             var turningSpeed = Math.min(speed, 15);
             var steerStrength = isDrifting ? 0.7 : 0.6;
