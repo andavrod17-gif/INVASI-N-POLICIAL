@@ -923,8 +923,10 @@
         var sideRoadPaths = [];
         var sideRoadPtsPer = [];
         var sideRoadConn = [];   // por cada desvío: { A:{idxMain}, B:{idxMain} }
+        var sideRoadGroups = []; // por cada desvío: array de meshes (para ocultarlos en modo policía)
         var roadWForClear = 8;   // ancho de despeje para las vías secundarias (sin árboles)
         function buildSideRoad(ctlPts, roadW) {
+            var groupMeshes = [];   // acumula todos los meshes de este desvío
             var curve = new THREE.CatmullRomCurve3(ctlPts, false);
             var cnt = 280;
             var pts = curve.getPoints(cnt);
@@ -983,6 +985,7 @@
             var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x56595f, roughness: 0.75, emissive: 0x1c1c22, emissiveIntensity: 0.35 }));
             m.receiveShadow = true;
             scene.add(m);
+            groupMeshes.push(m);
             // Línea central discontinua (amarilla) para resaltar la vía como circulable
             (function () {
                 var cl = [];
@@ -1011,6 +1014,7 @@
                     var cm = new THREE.Mesh(cgeo, new THREE.MeshBasicMaterial({ color: 0xffcc00, depthWrite: false }));
                     cm.renderOrder = 3;
                     scene.add(cm);
+                    groupMeshes.push(cm);
                 }
             })();
             // Bordes blancos
@@ -1039,9 +1043,12 @@
                 var mm = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false }));
                 mm.renderOrder = 3;
                 scene.add(mm);
+                groupMeshes.push(mm);
+                return mm;
             }
             sideLine(roadW / 2, 0.3);
             sideLine(-roadW / 2, 0.3);
+            sideRoadGroups.push(groupMeshes);
         }
 
         // Punto sobre el trazado principal lo más cercano a unas coordenadas
@@ -1996,8 +2003,22 @@
             menuEl.classList.remove('hidden');
         });
 
+        // Ajusta la cantidad de desvíos según el modo: en "policía" casi no hay vías
+        // secundarias (solo se deja un desvío), para mantener la persecución en la vía
+        // principal. En el resto de modos se muestran todos.
+        function applySideRoadsForMode() {
+            if (!sideRoadGroups || !sideRoadGroups.length) return;
+            var keep = (gameMode === 'policia') ? 1 : sideRoadGroups.length;
+            for (var i = 0; i < sideRoadGroups.length; i++) {
+                var visible = (i < keep);
+                var grp = sideRoadGroups[i];
+                for (var g = 0; g < grp.length; g++) grp[g].visible = visible;
+            }
+        }
+
         function startGame(mode) {
             gameMode = mode;
+            applySideRoadsForMode();
             gameEnded = false;
             runStats.time = 0;
             runStats.dist = 0;
@@ -3029,10 +3050,9 @@
                     }
                     idx = si;
                 } else {
-                    // En modo policía, el fugitivo está bastante delante (más margen de persecución)
-                    // En modo policía, el fugitivo aparece CERCA (adelante) del jugador
-                    // para que el encuentro sea inmediato: ~0.018 del lazo (~25 índices).
-                    var spread = (bi === 0) ? 0.018 : 0.07 + bi * 0.03;
+                    // En modo policía, el fugitivo aparece MUY CERCA (adelante) del jugador
+                    // para que el encuentro sea inmediato: ~0.008 del lazo (~11 índices).
+                    var spread = (bi === 0) ? 0.008 : 0.03 + bi * 0.02;
                     idx = ((playerIdx + Math.round(spread * roadPts.length)) % roadPts.length + roadPts.length) % roadPts.length;
                 }
                 var pt = roadPts[idx];
@@ -3320,7 +3340,7 @@
                             b.turboActive = true;
                         }
                     }
-                    b.speed += Math.min(tf - b.speed, 26 * (b.turboActive ? dt * 2.5 : dt));
+                    b.speed += Math.min(tf - b.speed, 14 * (b.turboActive ? dt * 2.5 : dt));
                     b.speed = Math.max(0, b.speed);
                     b.idx = b.idx + 1 * Math.max(1, b.speed) * perU * dt;
                     var mfi = ((Math.floor(b.idx) % pf) + pf) % pf;
@@ -3414,7 +3434,7 @@
                     }
                 }
 
-                var accel = (b.isPolice ? 60 : 26) * dt, brake = 60 * dt;
+                var accel = (b.isPolice ? 60 : 14) * dt, brake = 60 * dt;
                 if (b.speed < targetSpeed) b.speed += Math.min(targetSpeed - b.speed, accel);
                 else b.speed -= Math.min(b.speed - targetSpeed, brake);
                 b.speed = Math.max(0, b.speed);
