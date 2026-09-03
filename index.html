@@ -1877,7 +1877,7 @@
             reverseForce: 6000,
             turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo
             turboForce: 18000,       // empuje adicional cuando el turbo está activo
-            passiveChargeRate: 0.09, // carga sola del turbo por segundo (se llena automáticamente)
+            passiveChargeRate: 0.03, // carga del turbo por segundo (se recarga solo, pero lento)
             driftChargeRate: 0.0,   // el derrape ya NO recarga turbo (se recarga incluso menos derrapando)
             turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
             turboMinSpeed: 8,        // velocidad mínima para poder activar el turbo
@@ -3329,7 +3329,7 @@
                         var srelF = Math.min(1, b.speed / (diff.maxSpeed + 1));
                         b.drift = Math.max(0, curlF > 0 ? srelF * slipF : 0);
                         b.driftDir = curlF > 0.06 ? 1 : 0;
-                        b.turbo = Math.min(1, b.turbo + vcF.passiveChargeRate * 1.0 * dt);
+                        b.turbo = Math.min(1, b.turbo + vcF.passiveChargeRate * 3.0 * dt);
                         if (b.turboCooldown > 0) b.turboCooldown -= dt;
                         if (b.turboActive) {
                             b.turbo = Math.max(0, b.turbo - vcF.turboBurnRate * 0.7 * dt);
@@ -3405,8 +3405,8 @@
                     b.drift = Math.max(0, botCurv > 0 ? (botSpeedRel * botSlip) : 0);
                     b.driftDir = (hoDir * (Math.abs(botCurv) > 0 ? (Math.abs(botCurv) > 0.08 ? 1 : 0) : 0));
 
-                    // Recarga: pasiva + bono por derrape. Más lento que el jugador.
-                    b.turbo = Math.min(1, b.turbo + vc.passiveChargeRate * 1.0 * dt);
+                    // Recarga del bot: más rápido que el jugador para que use el turbo con frecuencia.
+                    b.turbo = Math.min(1, b.turbo + vc.passiveChargeRate * 3.0 * dt);
 
                     if (b.turboCooldown > 0) b.turboCooldown -= dt;
 
@@ -3795,7 +3795,7 @@
             if ((e.key === 'f' || e.key === 'F') && sirenSpot) { sirenOn = !sirenOn; }
             if ((e.key === 'q' || e.key === 'Q') && car && gameStarted && !gameEnded) { activateTurbo(); }
         });
-        document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+        document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; if ((e.key === 'q' || e.key === 'Q')) turboActive = false; });
 
         renderer.domElement.addEventListener('mousedown', function (e) {
             if (e.button === 0) { mouseDown = true; lastMouseX = e.clientX; }
@@ -4024,12 +4024,12 @@
 
                 // Carga del turbo: se recarga SOLO, siempre (anda normal o derrapando da igual).
                 turboCharge = Math.min(1, turboCharge + cfg.passiveChargeRate * dt);
-                // Consumo del turbo activo.
-                if (turboActive) {
+                // Consumo del turbo activo (solo mientras se mantiene pulsada la Q).
+                if (turboActive && keys['q']) {
                     turboCharge = Math.max(0, turboCharge - cfg.turboBurnRate * dt);
                     if (turboCharge <= 0) { turboActive = false; turboTimer = 0; }
                     else turboTimer += dt;
-                }
+                } else turboActive = false;
             }
 
             var downforce = 1 + speed * 0.02;
@@ -4081,7 +4081,7 @@
             V.z += (forward.z * aLong + right.z * latF / cfg.mass) * dt;
 
             // ===== TURBO: acelera hacia una velocidad objetivo =====
-            if (turboSystem && turboActive) {
+            if (turboSystem && turboActive && keys['q']) {
                 var turboTarget = cfg.maxSpeed * cfg.turboSpeedMul;   // p.ej. 70 * 1.35 = 94.5
                 var vLongT = V.x * forward.x + V.z * forward.z;
                 if (vLongT < turboTarget) {
