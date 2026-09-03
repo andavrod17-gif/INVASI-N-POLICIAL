@@ -1877,8 +1877,8 @@
             reverseForce: 6000,
             turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo
             turboForce: 18000,       // empuje adicional cuando el turbo está activo
-            passiveChargeRate: 0.02, // carga pasiva del turbo por segundo
-            driftChargeRate: 0.45,   // carga por segundo mientras se derrapa con deslizamiento real
+            passiveChargeRate: 0.0,  // carga pasiva del turbo por segundo (0 = solo derrapando en curva)
+            driftChargeRate: 1.4,   // carga por segundo mientras se derrapa con deslizamiento real en curva
             turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
             turboMinSpeed: 8,        // velocidad mínima para poder activar el turbo
             maxSteering: 0.4,
@@ -4024,10 +4024,15 @@
                 driftIntensity = isDrifting ? (speedRel * (0.35 + 0.65 * slipFrac)) : 0;
                 driftMeter += (driftIntensity - driftMeter) * Math.min(dt * 8, 1);
 
-                // Carga del turbo: pasiva + bonificación por derrape real.
-                turboCharge = Math.min(1, turboCharge + cfg.passiveChargeRate * dt);
-                if (isDrifting && driftIntensity > 0.2) {
-                    turboCharge = Math.min(1, turboCharge + cfg.driftChargeRate * driftIntensity * dt);
+                // Carga del turbo: SOLO derrapando de verdad (en curva con deslizamiento).
+                // Si vas en línea recta con Shift no hay deslizamiento → no recarga.
+                var curveDrift = isDrifting ? (driftIntensity * Math.min(1, Math.abs(slipAngle) / 0.3)) : 0;
+                if (curveDrift > 0.05) {
+                    turboCharge = Math.min(1, turboCharge + cfg.driftChargeRate * curveDrift * dt);
+                } else {
+                    // Sin derrape real: el turbo se desvanece con lentitud (o se mantiene) —
+                    // no se recarga gratis yendo recto.
+                    turboCharge = Math.max(0, turboCharge - 0.008 * dt);
                 }
                 // Consumo del turbo activo.
                 if (turboActive) {
