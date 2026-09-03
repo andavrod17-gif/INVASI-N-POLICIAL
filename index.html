@@ -1877,8 +1877,8 @@
             reverseForce: 6000,
             turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo
             turboForce: 18000,       // empuje adicional cuando el turbo está activo
-            passiveChargeRate: 0.0,  // carga pasiva del turbo por segundo (0 = solo derrapando en curva)
-            driftChargeRate: 1.4,   // carga por segundo mientras se derrapa con deslizamiento real en curva
+            passiveChargeRate: 0.15, // carga pasiva del turbo por segundo (rápida: se llena en ~7 s)
+            driftChargeRate: 0.0,   // el derrape ya NO recarga turbo
             turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
             turboMinSpeed: 8,        // velocidad mínima para poder activar el turbo
             maxSteering: 0.4,
@@ -3329,8 +3329,7 @@
                         var srelF = Math.min(1, b.speed / (diff.maxSpeed + 1));
                         b.drift = Math.max(0, curlF > 0 ? srelF * slipF : 0);
                         b.driftDir = curlF > 0.06 ? 1 : 0;
-                        b.turbo = Math.min(1, b.turbo + vcF.passiveChargeRate * 0.6 * dt);
-                        if (b.drift > 0.15) b.turbo = Math.min(1, b.turbo + vcF.driftChargeRate * 0.5 * b.drift * dt);
+                        b.turbo = Math.min(1, b.turbo + vcF.passiveChargeRate * 1.0 * dt);
                         if (b.turboCooldown > 0) b.turboCooldown -= dt;
                         if (b.turboActive) {
                             b.turbo = Math.max(0, b.turbo - vcF.turboBurnRate * 0.7 * dt);
@@ -3407,8 +3406,7 @@
                     b.driftDir = (hoDir * (Math.abs(botCurv) > 0 ? (Math.abs(botCurv) > 0.08 ? 1 : 0) : 0));
 
                     // Recarga: pasiva + bono por derrape. Más lento que el jugador.
-                    b.turbo = Math.min(1, b.turbo + vc.passiveChargeRate * 0.6 * dt);
-                    if (b.drift > 0.15) b.turbo = Math.min(1, b.turbo + vc.driftChargeRate * 0.5 * b.drift * dt);
+                    b.turbo = Math.min(1, b.turbo + vc.passiveChargeRate * 1.0 * dt);
 
                     if (b.turboCooldown > 0) b.turboCooldown -= dt;
 
@@ -4024,16 +4022,9 @@
                 driftIntensity = isDrifting ? (speedRel * (0.35 + 0.65 * slipFrac)) : 0;
                 driftMeter += (driftIntensity - driftMeter) * Math.min(dt * 8, 1);
 
-                // Carga del turbo: SOLO derrapando de verdad (en curva con deslizamiento).
-                // Si vas en línea recta con Shift no hay deslizamiento → no recarga.
-                var curveDrift = isDrifting ? (driftIntensity * Math.min(1, Math.abs(slipAngle) / 0.3)) : 0;
-                if (curveDrift > 0.05) {
-                    turboCharge = Math.min(1, turboCharge + cfg.driftChargeRate * curveDrift * dt);
-                } else {
-                    // Sin derrape real: el turbo se desvanece con lentitud (o se mantiene) —
-                    // no se recarga gratis yendo recto.
-                    turboCharge = Math.max(0, turboCharge - 0.008 * dt);
-                }
+                // Carga del turbo: recarga pasiva RÁPIDA (se llena sola mientras conduces).
+                // El derrape NO aumenta la recarga (solo es estilo); yendo recto igual recarga.
+                turboCharge = Math.min(1, turboCharge + cfg.passiveChargeRate * dt);
                 // Consumo del turbo activo.
                 if (turboActive) {
                     turboCharge = Math.max(0, turboCharge - cfg.turboBurnRate * dt);
