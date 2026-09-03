@@ -2745,9 +2745,15 @@
                 stats.push(statRow('Policías evadidos', runStats.policeEvaded));
                 if (!ok) stats.push(statRow('Nivel de alerta', runStats.alertLevel || 1));
             } else if (gameMode === 'policia') {
-                emoji = '🚓';
-                title = '✓ OBJETIVO DETENIDO';
-                sub = 'Capturaste al fugitivo';
+                if (chaseWon) {
+                    emoji = '🚓';
+                    title = '✓ OBJETIVO DETENIDO';
+                    sub = 'Capturaste al fugitivo';
+                } else {
+                    emoji = '😤';
+                    title = 'PERDISTE · SE TE ESCAPÓ';
+                    sub = 'El fugitivo se alejó demasiado';
+                }
                 stats.push(statRow('Tiempo de persecución', timeStr));
                 stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
                 stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
@@ -2916,6 +2922,7 @@
             lostTimer: 0,              // tiempo sin contacto
             escapeAccum: 0,            // tiempo fuera de rango para escapar (fugitivo)
             detAccum: 0,               // tiempo cerca del fugitivo para detener (policía)
+            farTimer: 0,               // tiempo que el fugitivo está demasiado lejos (policía pierde)
             detNotify: 0,
             catchTimer: 0,             // tiempo seguido con la policía encima (captura física)
             lastMsg: '',
@@ -2929,6 +2936,7 @@
             chase.lostTimer = 0;
             chase.escapeAccum = 0;
             chase.detAccum = 0;
+            chase.farTimer = 0;
             chase.detNotify = 0;
             chase.catchTimer = 0;
             chaseWon = false;
@@ -3233,11 +3241,25 @@
                     if (chase.active && fd < 26) {
                         chase.detAccum += dt;
                         if (chase.detAccum > 2.8) {
+                            chaseWon = true;    // capturado
                             showResultScreen(); // detennido
                             return;
                         }
                     } else {
                         chase.detAccum = Math.max(0, chase.detAccum - dt * 0.5);
+                    }
+                    // Si el fugitivo queda MUY lejos se escapa → el jugador PIERDE.
+                    if (fd > 420) {
+                        chase.farTimer += dt;
+                        if (chase.farTimer - dt < 0.4 && chase.farTimer <= 1.0) feedText('⚠️ ¡EL FUGITIVO SE ALEJA!', '#fbbf24');
+                        if (chase.farTimer > 3.5) {
+                            feedText('💨 EL FUGITIVO SE ESCAPÓ', '#ff6b6b');
+                            chaseWon = false;
+                            showResultScreen();
+                            return;
+                        }
+                    } else {
+                        chase.farTimer = Math.max(0, chase.farTimer - dt * 0.5);
                     }
                 }
             }
@@ -3339,8 +3361,10 @@
                             b.turboActive = true;
                         }
                     }
-                    // Aceleración igual a la del carro del jugador (~accelForce/mass = 11).
-                    b.speed += Math.min(tf - b.speed, 11 * (b.turboActive ? dt * 2.5 : dt));
+                    // Aceleración igual a la del carro del jugador: accelForce/mass = 11 y que
+                    // además disminuye a medida que gana velocidad (igual que el jugador).
+                    var accelF = 11 * Math.max(0.05, 1 - b.speed / (tf + 1));
+                    b.speed += Math.min(tf - b.speed, accelF * (b.turboActive ? dt * 2.5 : dt));
                     b.speed = Math.max(0, b.speed);
                     b.idx = b.idx + 1 * Math.max(1, b.speed) * perU * dt;
                     var mfi = ((Math.floor(b.idx) % pf) + pf) % pf;
@@ -3657,7 +3681,7 @@
                 document.getElementById('hudPolice').textContent = fugitiveCars().length;
                 document.getElementById('hudDist').textContent = '0 m';
                 document.getElementById('hudTime').textContent = '00:00';
-                right.style.display = 'none';
+                right.style.display = '';
                 left.style.display = '';
             }
         }
@@ -3711,6 +3735,20 @@
                 ab.style.background = color;
             } else if (gameMode === 'policia') {
                 document.getElementById('hudPolice').textContent = fugitiveCars().length;
+                // Nivel de distancia al fugitivo: CERCA / MEDIA / LEJOS + barra.
+                var fg = fugitiveCars();
+                if (fg.length) {
+                    var fDist = botDistToPlayer(fg[0]);
+                    document.getElementById('hudRightTitle').textContent = '📡 FUGITIVO';
+                    var lvTxt, fpct, fcol;
+                    if (fDist < 60)        { lvTxt = 'CERCA';    fpct = 100; fcol = '#ff3b3b'; }
+                    else if (fDist < 200)  { lvTxt = 'MEDIA';    fpct = 60;  fcol = '#fbbf24'; }
+                    else                   { lvTxt = 'LEJOS';    fpct = 25;  fcol = '#4ade80'; }
+                    document.getElementById('hudAlertLevel').textContent = lvTxt + ' · ' + Math.round(fDist) + ' m';
+                    var fab = document.getElementById('hudAlertBar');
+                    fab.style.width = fpct + '%';
+                    fab.style.background = fcol;
+                }
             } else if (gameMode === 'online') {
                 var oppCount = Object.keys(onlineOpps).length;
                 if (onlineRole === 'policia') {
