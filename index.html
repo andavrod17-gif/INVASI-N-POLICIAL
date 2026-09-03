@@ -3339,7 +3339,8 @@
                             b.turboActive = true;
                         }
                     }
-                    b.speed += Math.min(tf - b.speed, 14 * (b.turboActive ? dt * 2.5 : dt));
+                    // Aceleración igual a la del carro del jugador (~accelForce/mass = 11).
+                    b.speed += Math.min(tf - b.speed, 11 * (b.turboActive ? dt * 2.5 : dt));
                     b.speed = Math.max(0, b.speed);
                     b.idx = b.idx + 1 * Math.max(1, b.speed) * perU * dt;
                     var mfi = ((Math.floor(b.idx) % pf) + pf) % pf;
