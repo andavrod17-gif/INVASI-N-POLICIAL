@@ -410,6 +410,27 @@
             background: linear-gradient(90deg, #3b82f6, #22d3ee);
             transition: width 0.3s ease;
         }
+        .turbo-wrap {
+            margin-top: 9px;
+            display: none;               /* solo visible en modo online */
+            align-items: center;
+            gap: 8px;
+        }
+        .turbo-wrap.on { display: flex; }
+        .turbo-label { font-size: 11px; color: #ff9d2b; letter-spacing: 0.5px; white-space: nowrap; }
+        .turbar { flex: 1; min-width: 90px; }
+        .turbar > i {
+            display: block;
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #f97316, #ffb84d);
+            box-shadow: 0 0 10px rgba(255,140,0,0.6);
+            transition: width 0.1s linear;
+        }
+        .turbo-wrap.turbo-active .turbar > i {
+            background: linear-gradient(90deg, #ff5f2b, #ffd230);
+            box-shadow: 0 0 14px rgba(255,120,0,0.9);
+        }
         .hud-bottom {
             position: absolute;
             bottom: 16px;
@@ -683,6 +704,10 @@
         <div class="hud-bottom">
             <span class="speed-val" id="hudSpeed">0</span><span class="speed-unit">km/h</span>
             <div style="font-size:11px;color:#7d8ba1" id="hudGear">Marcha 1 · RPM 0</div>
+            <div class="turbo-wrap" id="turboWrap">
+                <span class="turbo-label">🔥 TURBO [X]</span>
+                <div class="bar turbar"><i id="hudTurbo" style="width:0%"></i></div>
+            </div>
         </div>
     </div>
 
@@ -1842,6 +1867,12 @@
             accelForce: 11000,
             brakeForce: 18,
             reverseForce: 6000,
+            turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo (online)
+            turboForce: 18000,       // empuje adicional cuando el turbo está activo (online)
+            passiveChargeRate: 0.02, // carga pasiva del turbo por segundo
+            driftChargeRate: 0.45,   // carga por segundo mientras se derrapa con deslizamiento real
+            turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
+            turboMinSpeed: 8,        // velocidad mínima para poder activar el turbo
             maxSteering: 0.4,
             steeringResponse: 5.0,
             frontGrip: 2.0,
@@ -1859,6 +1890,13 @@
             steerAngle: 0,
             speed: 0
         };
+
+        // ===== TURBO Y DRIFT (solo multijugador online) =====
+        var turboCharge = 0;           // 0..1 carga del turbo (se llena haciendo drift)
+        var turboActive = false;       // turbo desplegado en este momento
+        var turboTimer = 0;            // tiempo que lleva el turbo activo
+        var driftMeter = 0;            // 0..1 intensidad del derrape actual (solo en online)
+        var driftAccum = 0;            // acumulador interno de derrape
 
         // ===== GAME MODE SYSTEM =====
         var gameMode = null;          // 'fugitivo' | 'policia' | 'libre'
@@ -1965,6 +2003,11 @@
             runStats.topSpeedKmh = 0;
             runStats.policeEvaded = 0;
             runStats.collisions = 0;
+            // Reset del turbo/drift al iniciar partida
+            turboCharge = 0;
+            turboActive = false;
+            turboTimer = 0;
+            driftMeter = 0;
 
             if (mode === 'online') {
                 onlineStartGameLocal();
@@ -3483,6 +3526,8 @@
             feed.textContent = '';
             feed.style.opacity = 0;
             if (mode === 'libre') {
+                var twx = document.getElementById('turboWrap');
+                if (twx) twx.classList.remove('on');
                 document.getElementById('hudLeftTitle').textContent = '🏎️ CONDUCCIÓN LIBRE';
                 document.getElementById('hudPolice').textContent = '—';
                 document.getElementById('hudDist').textContent = '0 m';
@@ -3508,6 +3553,8 @@
                 document.getElementById('hudAlertBar').style.width = '0%';
                 right.style.display = '';
                 left.style.display = '';
+                var tw = document.getElementById('turboWrap');
+                if (tw) tw.classList.add('on');
             } else if (mode === 'policia') {
                 document.getElementById('hudLeftTitle').textContent = '🚓 SER POLICÍA';
                 document.getElementById('hudPolice').textContent = fugitiveCars().length;
@@ -3525,6 +3572,12 @@
             runStats.topSpeedKmh = Math.max(runStats.topSpeedKmh, kmh);
             document.getElementById('hudSpeed').textContent = Math.round(kmh);
             document.getElementById('hudGear').textContent = 'Marcha ' + currentGear + ' · RPM ' + Math.round(1000 + Math.abs(carState.speed) * 20);
+
+            // Barra de turbo (solo online): carga + estado activo
+            var tb = document.getElementById('hudTurbo');
+            if (tb) tb.style.width = (turboCharge * 100) + '%';
+            var tbw = document.getElementById('turboWrap');
+            if (tbw) { if (turboActive) tbw.classList.add('turbo-active'); else tbw.classList.remove('turbo-active'); }
 
             // Distancia recorrida
             var dx = car.position.x - runStats.lastPos.x;
@@ -3644,6 +3697,7 @@
             if (e.key === '3') camMode = 3;
             if (camMode !== prevCam && camMode !== 3) camSnap = true;
             if ((e.key === 'f' || e.key === 'F') && sirenSpot) { sirenOn = !sirenOn; }
+            if ((e.key === 'x' || e.key === 'X') && car && gameStarted && !gameEnded && gameMode === 'online') { activateTurbo(); }
         });
         document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
@@ -3783,6 +3837,17 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+        function activateTurbo() {
+            if (gameEnded || !car || gameMode !== 'online') return;
+            var cfg = VehicleConfig;
+            if (turboCharge <= 0) { feedText('⚠️ Sin turbo — haz drift (Shift) para recargar', '#7d8ba1'); return; }
+            if (carState.speed < cfg.turboMinSpeed) { feedText('⚠️ Acelera antes de usar el turbo', '#7d8ba1'); return; }
+            if (!turboActive) {
+                turboActive = true;
+                turboTimer = 0;
+                feedText('🔥 ¡TURBO!', '#ff9d2b');
+            }
+        }
         function updateVehiclePhysics(dt) {
             var S = carState;
             var V = S.velocity;
@@ -3846,19 +3911,58 @@
 
             var slipAngle = Math.atan2(vLat, Math.max(Math.abs(vLong), 0.5));
 
+            // ===== MECÁNICA DE DRIFT + TURBO (SOLO MODO ONLINE) =====
+            // En modo online se usa la mecánica mejorada de derrape y recarga de turbo.
+            // En los modos de un jugador la física se mantiene como estaba (binaria).
+            var onlineTurbo = (gameMode === 'online');
+            var isDrifting = keys['shift'];
+            var driftIntensity = 0;
+            if (onlineTurbo) {
+                // Intensidad de derrape real: velocidad + giro + deslizamiento. Requiere
+                // soltar el derrape con Shift a velocidad y girando para recargar turbo.
+                var steerMagNow = Math.abs(wheelAngle);
+                var speedRel = Math.min(1, speed / 45);
+                var slipFrac = Math.min(1, Math.abs(slipAngle) / 0.5);
+                // El drift solo es "efectivo" si de verdad hay deslizamiento (girando a velocidad).
+                driftIntensity = isDrifting ? (speedRel * (0.35 + 0.65 * slipFrac)) : 0;
+                driftMeter += (driftIntensity - driftMeter) * Math.min(dt * 8, 1);
+
+                // Carga del turbo: pasiva + bonificación por derrape real.
+                turboCharge = Math.min(1, turboCharge + cfg.passiveChargeRate * dt);
+                if (isDrifting && driftIntensity > 0.2) {
+                    turboCharge = Math.min(1, turboCharge + cfg.driftChargeRate * driftIntensity * dt);
+                }
+                // Consumo del turbo activo.
+                if (turboActive) {
+                    turboCharge = Math.max(0, turboCharge - cfg.turboBurnRate * dt);
+                    if (turboCharge <= 0) { turboActive = false; turboTimer = 0; }
+                    else turboTimer += dt;
+                }
+            } else {
+                driftMeter = 0;   // fuera de online no hay medidor de derrape
+            }
+
             var downforce = 1 + speed * 0.02;
             var maxGripF = cfg.mass * 9.8 * cfg.frontGrip * downforce;
-            var rearGripNow = isDrifting ? cfg.rearGrip * 0.6 : cfg.rearGrip;
+            // En online el derrape es PROGRESIVO (más control y más dsp matiza); fuera, binario.
+            var rearGripNow = onlineTurbo
+                ? cfg.rearGrip * (1 - 0.5 * (isDrifting ? driftIntensity : 0))
+                : (isDrifting ? cfg.rearGrip * 0.6 : cfg.rearGrip);
             var rearMaxF = cfg.mass * 9.8 * rearGripNow * downforce;
 
-            var driftFactor = isDrifting ? 0.55 : 1.0;
+            var driftFactor = onlineTurbo ? (1 - 0.35 * (isDrifting ? driftIntensity : 0)) : (isDrifting ? 0.55 : 1.0);
 
-            var frontLatRaw = wheelAngle * Math.min(speed, 15) * (cfg.mass * 0.35);            var lateralStabilize = -slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? 0.5 : 1.0);
+            var frontLatRaw = wheelAngle * Math.min(speed, 15) * (cfg.mass * 0.35);            var lateralStabilize = onlineTurbo
+                ? (-slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? (1 - 0.5 * driftIntensity) : 1.0))
+                : (-slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? 0.5 : 1.0));
 
             frontLatRaw = THREE.MathUtils.clamp(frontLatRaw, -maxGripF, maxGripF);
             var rearLatRaw = THREE.MathUtils.clamp(lateralStabilize, -rearMaxF, rearMaxF);
 
             var drag = cfg.dragCoef * speed * speed * 0.5 + cfg.rollingCoef * speed;
+            // Con el turbo activo (online) la resistencia queda muy atenuada para que el
+            // carro pueda superar la velocidad máxima de crucero.
+            if (onlineTurbo && turboActive) drag *= 0.15;
             // Frenado natural del motor: al soltar TODAS las entradas de motor (ni "w" ni "s"),
             // el carro decelera de forma perceptible en vez de rodar indefinidamente.
             if (throttle <= 0 && brake <= 0) {
@@ -3885,6 +3989,17 @@
             V.x += (forward.x * aLong + right.x * latF / cfg.mass) * dt;
             V.z += (forward.z * aLong + right.z * latF / cfg.mass) * dt;
 
+            // ===== TURBO (online): acelera hacia una velocidad objetivo =====
+            if (onlineTurbo && turboActive) {
+                var turboTarget = cfg.maxSpeed * cfg.turboSpeedMul;   // p.ej. 70 * 1.35 = 94.5
+                var vLongT = V.x * forward.x + V.z * forward.z;
+                if (vLongT < turboTarget) {
+                    var turboAcc = (cfg.turboForce / cfg.mass) * Math.min(2.0, 1 + (turboTarget - vLongT) / turboTarget);
+                    V.x += forward.x * turboAcc * dt;
+                    V.z += forward.z * turboAcc * dt;
+                }
+            }
+
             // Fricción / arrastre VECTORIAL: se opone a la velocidad real (V),
             // no a la dirección "forward". Así frena tanto el avance como la
             // marcha atrás, evitando que el carro acelere sin tope al rodar atrás.
@@ -3906,9 +4021,10 @@
             }
 
             var turningSpeed = Math.min(speed, 15);
-            var steerStrength = isDrifting ? 0.7 : 0.6;
+            // En online el giro responde mejor al derrape real (proporcional a la intensidad).
+            var steerStrength = isDrifting ? (onlineTurbo ? 0.75 + 0.15 * driftIntensity : 0.7) : 0.6;
             var yawFromSteer = -wheelAngle * turningSpeed * steerStrength;
-            var yawFromSlip = -slipAngle * cfg.frontGrip * (isDrifting ? 0.35 : 0.55);
+            var yawFromSlip = -slipAngle * cfg.frontGrip * (isDrifting ? (onlineTurbo ? 0.3 + 0.25 * driftIntensity : 0.35) : 0.55);
             var targetYaw = yawFromSteer + yawFromSlip;
             S.yawRate += (targetYaw - S.yawRate) * Math.min(dt * 5.0, 1);
             S.heading += S.yawRate * dt;
