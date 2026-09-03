@@ -1877,8 +1877,8 @@
             reverseForce: 6000,
             turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo
             turboForce: 18000,       // empuje adicional cuando el turbo está activo
-            passiveChargeRate: 0.15, // carga pasiva del turbo por segundo (rápida: se llena en ~7 s)
-            driftChargeRate: 0.0,   // el derrape ya NO recarga turbo
+            passiveChargeRate: 0.04, // carga pasiva del turbo por segundo al andar normal (recarga poca)
+            driftChargeRate: 0.0,   // el derrape ya NO recarga turbo (se recarga incluso menos derrapando)
             turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
             turboMinSpeed: 8,        // velocidad mínima para poder activar el turbo
             maxSteering: 0.4,
@@ -4022,9 +4022,10 @@
                 driftIntensity = isDrifting ? (speedRel * (0.35 + 0.65 * slipFrac)) : 0;
                 driftMeter += (driftIntensity - driftMeter) * Math.min(dt * 8, 1);
 
-                // Carga del turbo: recarga pasiva RÁPIDA (se llena sola mientras conduces).
-                // El derrape NO aumenta la recarga (solo es estilo); yendo recto igual recarga.
-                turboCharge = Math.min(1, turboCharge + cfg.passiveChargeRate * dt);
+                // Carga del turbo: al andar NORMAL se recarga poco; mientras derrapas se recarga
+                // aún menos (el drift casi no llena el turbo).
+                var chargeNow = cfg.passiveChargeRate * (isDrifting ? 0.15 : 1.0);
+                turboCharge = Math.min(1, turboCharge + chargeNow * dt);
                 // Consumo del turbo activo.
                 if (turboActive) {
                     turboCharge = Math.max(0, turboCharge - cfg.turboBurnRate * dt);
