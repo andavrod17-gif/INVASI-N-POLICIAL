@@ -3025,8 +3025,8 @@
             if (gameMode === 'libre' || !roadPts.length) return;
 
             var diff = DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal;
-            // Nivel de alerta inicial: en fugitivo comenzar con 1 policía (sistema escalable)
-            var n = gameMode === 'fugitivo' ? 1 : 2;
+            // Nivel de alerta inicial: 1 perseguido (en fugitivo 1 policía, en policía 1 fugitivo)
+            var n = (gameMode === 'fugitivo' || gameMode === 'policia') ? 1 : 2;
             var playerIdx = nearestRoadIdx(car.position.x, car.position.z);
             for (var bi = 0; bi < n; bi++) {
                 var isPolice = (gameMode === 'fugitivo');   // en fugitivo los bots son policías
