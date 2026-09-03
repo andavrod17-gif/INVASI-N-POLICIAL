@@ -585,7 +585,7 @@
                     <span class="arrow">›</span>
                 </button>
             </div>
-            <div class="menu-footer">WASD · Shift drift · F sirena · C cámara · ESC menú</div>
+            <div class="menu-footer">WASD · Shift drift · Q turbo · F sirena · C cámara · ESC menú</div>
         </div>
     </div>
 
@@ -705,7 +705,7 @@
             <span class="speed-val" id="hudSpeed">0</span><span class="speed-unit">km/h</span>
             <div style="font-size:11px;color:#7d8ba1" id="hudGear">Marcha 1 · RPM 0</div>
             <div class="turbo-wrap" id="turboWrap">
-                <span class="turbo-label">🔥 TURBO [X]</span>
+                <span class="turbo-label">🔥 TURBO [Q]</span>
                 <div class="bar turbar"><i id="hudTurbo" style="width:0%"></i></div>
             </div>
         </div>
@@ -719,7 +719,8 @@
             <div></div><div class="tbtn" data-k="s">▼</div><div></div>
         </div>
         <div class="tpad r" id="tRight">
-            <div class="tbtn" data-k="shift">↻</div><div class="tbtn" data-k="f">🚨</div>
+            <div class="tbtn" data-k="q">🔥</div><div class="tbtn" data-k="f">🚨</div>
+            <div></div><div class="tbtn" data-k="shift">↻</div>
         </div>
     </div>
 
@@ -1867,8 +1868,8 @@
             accelForce: 11000,
             brakeForce: 18,
             reverseForce: 6000,
-            turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo (online)
-            turboForce: 18000,       // empuje adicional cuando el turbo está activo (online)
+            turboSpeedMul: 1.35,     // multiplicador de velocidad tope con el turbo
+            turboForce: 18000,       // empuje adicional cuando el turbo está activo
             passiveChargeRate: 0.02, // carga pasiva del turbo por segundo
             driftChargeRate: 0.45,   // carga por segundo mientras se derrapa con deslizamiento real
             turboBurnRate: 0.22,     // consumo del turbo por segundo (lleno dura ~4,5 s)
@@ -1891,11 +1892,11 @@
             speed: 0
         };
 
-        // ===== TURBO Y DRIFT (solo multijugador online) =====
+        // ===== TURBO Y DRIFT (todos los modos) =====
         var turboCharge = 0;           // 0..1 carga del turbo (se llena haciendo drift)
         var turboActive = false;       // turbo desplegado en este momento
         var turboTimer = 0;            // tiempo que lleva el turbo activo
-        var driftMeter = 0;            // 0..1 intensidad del derrape actual (solo en online)
+        var driftMeter = 0;            // 0..1 intensidad del derrape actual
         var driftAccum = 0;            // acumulador interno de derrape
 
         // ===== GAME MODE SYSTEM =====
@@ -3067,7 +3068,12 @@
                     uTurnCx: 0,          // centro del círculo del giro
                     uTurnCz: 0,
                     uTurnA0: 0,           // ángulo inicial del arco
-                    prevDP: null          // última distancia por vía (policía - jugador) para detectar rebase
+                    prevDP: null,          // última distancia por vía (policía - jugador) para detectar rebase
+                    turbo: Math.random() * 0.5 + 0.5,   // carga de turbo del bot (0..1)
+                    turboActive: false,    // turbo desplegado por el bot
+                    turboCooldown: 0,      // cuánto esperar el bot antes de volver a turbo
+                    drift: 0,              // 0..1 intensidad de derrape visual del bot
+                    driftDir: 0            // lado del derrape (-1/1) para orientar un poco las ruedas
                 };
                 // Extensión de enrutamiento por el grafo de carreteras
                 plantBotOn(bot, 0, idx);
@@ -3292,7 +3298,29 @@
                     var pf = roadPts.length, perU = n / totalLen;
                     // velocidad objetivo de huida
                     var tf = diff.maxSpeed * 0.9;
-                    b.speed += Math.min(tf - b.speed, 26 * dt);
+                    // ===== TURBO + DRIFT del fugitivo (bot) =====
+                    // El fugitivo recarga turbo y lo despliega en rachas para intentar escapar.
+                    {
+                        var vcF = VehicleConfig;
+                        var mf = Math.floor(b.idx);
+                        var curlF = 0;
+                        for (var lF = 1; lF <= 4; lF++) curlF = Math.max(curlF, trackCurvatureOn(0, (mf + lF) % pf));
+                        var slipF = Math.min(1, Math.abs(curlF) * 3.0);
+                        var srelF = Math.min(1, b.speed / (diff.maxSpeed + 1));
+                        b.drift = Math.max(0, curlF > 0 ? srelF * slipF : 0);
+                        b.driftDir = curlF > 0.06 ? 1 : 0;
+                        b.turbo = Math.min(1, b.turbo + vcF.passiveChargeRate * 0.6 * dt);
+                        if (b.drift > 0.15) b.turbo = Math.min(1, b.turbo + vcF.driftChargeRate * 0.5 * b.drift * dt);
+                        if (b.turboCooldown > 0) b.turboCooldown -= dt;
+                        if (b.turboActive) {
+                            b.turbo = Math.max(0, b.turbo - vcF.turboBurnRate * 0.7 * dt);
+                            tf = diff.maxSpeed * (1 + (vcF.turboSpeedMul - 1) * 0.55);
+                            if (b.turbo <= 0 || curlF >= 0.06) { b.turboActive = false; b.turboCooldown = 1.2 + Math.random() * 1.4; }
+                        } else if (b.turbo > 0.85 && curlF < 0.04 && b.turboCooldown <= 0) {
+                            b.turboActive = true;
+                        }
+                    }
+                    b.speed += Math.min(tf - b.speed, 26 * (b.turboActive ? dt * 2.5 : dt));
                     b.speed = Math.max(0, b.speed);
                     b.idx = b.idx + 1 * Math.max(1, b.speed) * perU * dt;
                     var mfi = ((Math.floor(b.idx) % pf) + pf) % pf;
@@ -3305,6 +3333,8 @@
                     var ttF = roadCurve.getTangent((b.idx / (pf - 1)) % 1);
                     b.heading += THREE.MathUtils.clamp(Math.atan2(ttF.x, ttF.z) - b.heading, -3 * dt, 3 * dt);
                     b.group.rotation.y = b.heading;
+                    var rollF = (b.drift !== undefined) ? (-b.driftDir * b.drift * 0.35) : 0;
+                    b.group.rotation.z += (rollF - b.group.rotation.z) * Math.min(dt * 6, 1);
                     b.segIdx = 0;
                     continue;
                 }
@@ -3342,6 +3372,47 @@
                     if (physDist < 12) targetSpeed = 4 + physDist * 1.2;
                 }
                 targetSpeed = Math.min(targetSpeed, safeSpeed);
+
+                // ===== TURBO + DRIFT DE LOS BOTS =====
+                // Los bots recargan turbo de forma continua y lo despliegan en tramos
+                // rectos/rápidos (curvatura baja) para superar su velocidad de crucero.
+                // Al girar fuerte deslizan (drift) y eso recarga su turbo más rápido.
+                {
+                    var vc = VehicleConfig;
+                    // Derrape del bot según curvatura + velocidad (visual y de recarga).
+                    var botCurv = curv;
+                    var botSpeedRel = Math.min(1, b.speed / (diff.maxSpeed + 1));
+                    var botSlip = Math.min(1, botCurv * 3.0);
+                    b.drift = Math.max(0, botCurv > 0 ? (botSpeedRel * botSlip) : 0);
+                    b.driftDir = (hoDir * (Math.abs(botCurv) > 0 ? (Math.abs(botCurv) > 0.08 ? 1 : 0) : 0));
+
+                    // Recarga: pasiva + bono por derrape. Más lento que el jugador.
+                    b.turbo = Math.min(1, b.turbo + vc.passiveChargeRate * 0.6 * dt);
+                    if (b.drift > 0.15) b.turbo = Math.min(1, b.turbo + vc.driftChargeRate * 0.5 * b.drift * dt);
+
+                    if (b.turboCooldown > 0) b.turboCooldown -= dt;
+
+                    // ¿Cuándo turbo? En tramos con poca curvatura y a velocidad suficiente,
+                    // y estando en persecución (policía) o escapando (fugitivo).
+                    var straightEnough = curv < 0.04;
+                    var wantBoost = straightEnough && b.speed > 15;
+                    if (b.isPolice) wantBoost = wantBoost && pursuing;
+                    else wantBoost = wantBoost && b.speed > diff.maxSpeed * 0.32;
+                    if (b.turboActive) {
+                        // Consumir el turbo y ampliar objetivos.
+                        b.turbo = Math.max(0, b.turbo - vc.turboBurnRate * 0.7 * dt);
+                        if (b.turbo <= 0 || !wantBoost || curv >= 0.06) {
+                            b.turboActive = false;
+                            b.turboCooldown = 1.2 + Math.random() * 1.4;
+                        } else {
+                            var botBoostMul = 1 + (vc.turboSpeedMul - 1) * 0.55;   // bots algo menos agresivos
+                            safeSpeed = Math.min(safeSpeed * botBoostMul, diff.maxSpeed * botBoostMul);
+                            targetSpeed = Math.max(targetSpeed, Math.min(diff.maxSpeed * botBoostMul * (b.isPolice ? 0.98 : 0.92), safeSpeed));
+                        }
+                    } else if (b.turbo > 0.85 && wantBoost && b.turboCooldown <= 0) {
+                        b.turboActive = true;   // mete el turbo
+                    }
+                }
 
                 var accel = (b.isPolice ? 60 : 26) * dt, brake = 60 * dt;
                 if (b.speed < targetSpeed) b.speed += Math.min(targetSpeed - b.speed, accel);
@@ -3404,6 +3475,9 @@
                 var turnStep = maxTurn * dt;
                 b.heading += THREE.MathUtils.clamp(dh, -turnStep, turnStep);
                 b.group.rotation.y = b.heading;
+                // Inclinación lateral por derrape (efecto visual leve).
+                var rollTarget = (b.drift !== undefined) ? (-b.driftDir * b.drift * 0.35) : 0;
+                b.group.rotation.z += (rollTarget - b.group.rotation.z) * Math.min(dt * 6, 1);
 
                 // ----- Transición al siguiente tramo -----
                 if (clamped && isChasePolice && b.plan) {
@@ -3527,7 +3601,7 @@
             feed.style.opacity = 0;
             if (mode === 'libre') {
                 var twx = document.getElementById('turboWrap');
-                if (twx) twx.classList.remove('on');
+                if (twx) twx.classList.add('on');
                 document.getElementById('hudLeftTitle').textContent = '🏎️ CONDUCCIÓN LIBRE';
                 document.getElementById('hudPolice').textContent = '—';
                 document.getElementById('hudDist').textContent = '0 m';
@@ -3535,6 +3609,8 @@
                 right.style.display = 'none';
                 left.style.display = '';
             } else if (mode === 'fugitivo') {
+                var twF = document.getElementById('turboWrap');
+                if (twF) twF.classList.add('on');
                 document.getElementById('hudLeftTitle').textContent = '🚨 SER FUGITIVO';
                 document.getElementById('hudPolice').textContent = policeCars().length;
                 document.getElementById('hudDist').textContent = '0 m';
@@ -3556,6 +3632,8 @@
                 var tw = document.getElementById('turboWrap');
                 if (tw) tw.classList.add('on');
             } else if (mode === 'policia') {
+                var twP = document.getElementById('turboWrap');
+                if (twP) twP.classList.add('on');
                 document.getElementById('hudLeftTitle').textContent = '🚓 SER POLICÍA';
                 document.getElementById('hudPolice').textContent = fugitiveCars().length;
                 document.getElementById('hudDist').textContent = '0 m';
@@ -3573,7 +3651,7 @@
             document.getElementById('hudSpeed').textContent = Math.round(kmh);
             document.getElementById('hudGear').textContent = 'Marcha ' + currentGear + ' · RPM ' + Math.round(1000 + Math.abs(carState.speed) * 20);
 
-            // Barra de turbo (solo online): carga + estado activo
+            // Barra de turbo: carga + estado activo
             var tb = document.getElementById('hudTurbo');
             if (tb) tb.style.width = (turboCharge * 100) + '%';
             var tbw = document.getElementById('turboWrap');
@@ -3642,7 +3720,7 @@
         // ===== Controles táctiles =====
         document.querySelectorAll('#touch .tbtn').forEach(function (btn) {
             var k = btn.getAttribute('data-k').toLowerCase();
-            var down = function (e) { e.preventDefault(); keys[k] = true; btn.classList.add('active'); };
+            var down = function (e) { e.preventDefault(); keys[k] = true; btn.classList.add('active'); if (k === 'q' && typeof activateTurbo === 'function') activateTurbo(); };
             var up = function (e) { e.preventDefault(); keys[k] = false; btn.classList.remove('active'); };
             btn.addEventListener('touchstart', down, { passive: false });
             btn.addEventListener('touchend', up, { passive: false });
@@ -3697,7 +3775,7 @@
             if (e.key === '3') camMode = 3;
             if (camMode !== prevCam && camMode !== 3) camSnap = true;
             if ((e.key === 'f' || e.key === 'F') && sirenSpot) { sirenOn = !sirenOn; }
-            if ((e.key === 'x' || e.key === 'X') && car && gameStarted && !gameEnded && gameMode === 'online') { activateTurbo(); }
+            if ((e.key === 'q' || e.key === 'Q') && car && gameStarted && !gameEnded) { activateTurbo(); }
         });
         document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
@@ -3838,7 +3916,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
         function activateTurbo() {
-            if (gameEnded || !car || gameMode !== 'online') return;
+            if (gameEnded || !car) return;
             var cfg = VehicleConfig;
             if (turboCharge <= 0) { feedText('⚠️ Sin turbo — haz drift (Shift) para recargar', '#7d8ba1'); return; }
             if (carState.speed < cfg.turboMinSpeed) { feedText('⚠️ Acelera antes de usar el turbo', '#7d8ba1'); return; }
@@ -3911,15 +3989,14 @@
 
             var slipAngle = Math.atan2(vLat, Math.max(Math.abs(vLong), 0.5));
 
-            // ===== MECÁNICA DE DRIFT + TURBO (SOLO MODO ONLINE) =====
-            // En modo online se usa la mecánica mejorada de derrape y recarga de turbo.
-            // En los modos de un jugador la física se mantiene como estaba (binaria).
-            var onlineTurbo = (gameMode === 'online');
+            // ===== MECÁNICA DE DRIFT + TURBO (TODOS LOS MODOS) =====
+            // El sistema de derrape y turbo funciona en fugitivo, policía, libre y online.
+            var turboSystem = true;
             var isDrifting = keys['shift'];
             var driftIntensity = 0;
-            if (onlineTurbo) {
-                // Intensidad de derrape real: velocidad + giro + deslizamiento. Requiere
-                // soltar el derrape con Shift a velocidad y girando para recargar turbo.
+            // Intensidad de derrape real: velocidad + giro + deslizamiento. Se cobra
+            // derrapando con Shift a velocidad y girando para recargar turbo.
+            {
                 var steerMagNow = Math.abs(wheelAngle);
                 var speedRel = Math.min(1, speed / 45);
                 var slipFrac = Math.min(1, Math.abs(slipAngle) / 0.5);
@@ -3938,31 +4015,30 @@
                     if (turboCharge <= 0) { turboActive = false; turboTimer = 0; }
                     else turboTimer += dt;
                 }
-            } else {
-                driftMeter = 0;   // fuera de online no hay medidor de derrape
             }
 
             var downforce = 1 + speed * 0.02;
             var maxGripF = cfg.mass * 9.8 * cfg.frontGrip * downforce;
-            // En online el derrape es PROGRESIVO (más control y más dsp matiza); fuera, binario.
-            var rearGripNow = onlineTurbo
-                ? cfg.rearGrip * (1 - 0.5 * (isDrifting ? driftIntensity : 0))
-                : (isDrifting ? cfg.rearGrip * 0.6 : cfg.rearGrip);
+            // El derrape es PROGRESIVO (más control y mejor respuesta a mayor intensidad).
+            var rearGripNow = cfg.rearGrip * (1 - 0.5 * (isDrifting ? driftIntensity : 0));
             var rearMaxF = cfg.mass * 9.8 * rearGripNow * downforce;
 
-            var driftFactor = onlineTurbo ? (1 - 0.35 * (isDrifting ? driftIntensity : 0)) : (isDrifting ? 0.55 : 1.0);
+            var driftFactor = (1 - 0.35 * (isDrifting ? driftIntensity : 0));
 
-            var frontLatRaw = wheelAngle * Math.min(speed, 15) * (cfg.mass * 0.35);            var lateralStabilize = onlineTurbo
-                ? (-slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? (1 - 0.5 * driftIntensity) : 1.0))
-                : (-slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? 0.5 : 1.0));
+            var frontLatRaw = wheelAngle * Math.min(speed, 15) * (cfg.mass * 0.35);            var lateralStabilize = -slipAngle * Math.min(speed, 20) * (cfg.mass * 10) * (isDrifting ? (1 - 0.5 * driftIntensity) : 1.0);
 
             frontLatRaw = THREE.MathUtils.clamp(frontLatRaw, -maxGripF, maxGripF);
             var rearLatRaw = THREE.MathUtils.clamp(lateralStabilize, -rearMaxF, rearMaxF);
 
             var drag = cfg.dragCoef * speed * speed * 0.5 + cfg.rollingCoef * speed;
-            // Con el turbo activo (online) la resistencia queda muy atenuada para que el
+            // Con el turbo activo la resistencia queda muy atenuada para que el
             // carro pueda superar la velocidad máxima de crucero.
-            if (onlineTurbo && turboActive) drag *= 0.15;
+            if (turboSystem && turboActive) drag *= 0.15;
+            // Durante un derrape real el carro conserva mejor la velocidad (menos fricción),
+            // reflejando un drift arcade suave que apenas pierde impulso al girar fuerte.
+            if (isDrifting && driftIntensity > 0.05) {
+                drag *= 0.6 + 0.4 * (1 - driftIntensity);
+            }
             // Frenado natural del motor: al soltar TODAS las entradas de motor (ni "w" ni "s"),
             // el carro decelera de forma perceptible en vez de rodar indefinidamente.
             if (throttle <= 0 && brake <= 0) {
@@ -3989,8 +4065,8 @@
             V.x += (forward.x * aLong + right.x * latF / cfg.mass) * dt;
             V.z += (forward.z * aLong + right.z * latF / cfg.mass) * dt;
 
-            // ===== TURBO (online): acelera hacia una velocidad objetivo =====
-            if (onlineTurbo && turboActive) {
+            // ===== TURBO: acelera hacia una velocidad objetivo =====
+            if (turboSystem && turboActive) {
                 var turboTarget = cfg.maxSpeed * cfg.turboSpeedMul;   // p.ej. 70 * 1.35 = 94.5
                 var vLongT = V.x * forward.x + V.z * forward.z;
                 if (vLongT < turboTarget) {
@@ -4021,10 +4097,10 @@
             }
 
             var turningSpeed = Math.min(speed, 15);
-            // En online el giro responde mejor al derrape real (proporcional a la intensidad).
-            var steerStrength = isDrifting ? (onlineTurbo ? 0.75 + 0.15 * driftIntensity : 0.7) : 0.6;
+            // El giro responde mejor al derrape real (proporcional a la intensidad).
+            var steerStrength = isDrifting ? (0.75 + 0.15 * driftIntensity) : 0.6;
             var yawFromSteer = -wheelAngle * turningSpeed * steerStrength;
-            var yawFromSlip = -slipAngle * cfg.frontGrip * (isDrifting ? (onlineTurbo ? 0.3 + 0.25 * driftIntensity : 0.35) : 0.55);
+            var yawFromSlip = -slipAngle * cfg.frontGrip * (isDrifting ? (0.3 + 0.25 * driftIntensity) : 0.55);
             var targetYaw = yawFromSteer + yawFromSlip;
             S.yawRate += (targetYaw - S.yawRate) * Math.min(dt * 5.0, 1);
             S.heading += S.yawRate * dt;
@@ -4229,7 +4305,7 @@
                 camera.lookAt(camLook);
             }
 
-            document.getElementById('info').textContent = camNames[camMode - 1] + ' | W adelante | A/D girar | S freno/reversa | Shift derrapar | F sirena | C cámara';
+            document.getElementById('info').textContent = camNames[camMode - 1] + ' | W adelante | A/D girar | S freno/reversa | Shift derrapar | Q turbo | F sirena | C cámara';
         }
 
         var lastTime = performance.now();
