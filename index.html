@@ -2986,7 +2986,9 @@
                     idx = si;
                 } else {
                     // En modo policía, el fugitivo está bastante delante (más margen de persecución)
-                    var spread = (bi === 0) ? 0.12 : 0.30 + bi * 0.1;
+                    // En modo policía, el fugitivo aparece CERCA (adelante) del jugador
+                    // para que el encuentro sea inmediato: ~0.018 del lazo (~25 índices).
+                    var spread = (bi === 0) ? 0.018 : 0.07 + bi * 0.03;
                     idx = ((playerIdx + Math.round(spread * roadPts.length)) % roadPts.length + roadPts.length) % roadPts.length;
                 }
                 var pt = roadPts[idx];
