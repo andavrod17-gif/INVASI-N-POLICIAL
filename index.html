@@ -2149,6 +2149,10 @@
         var onlineHits = 0;                 // choques que el POLICÍA le ha dado al fugitivo (para ganar con 2)
         var onlineHitCooldown = 0;      // enfriamiento para no contar el mismo impacto varias veces
 
+        var policeHits = 0;             // choques al fugitivo en modo policía (single-player)
+        var policeHitCooldown = 0;      // cooldown para no contar el mismo impacto dos veces
+        var fugitiveFlash = 0;          // tiempo de efecto visual de impacto en el fugitivo
+
         function wsSend(obj) {
             if (obj.type === 'create') {
                 onlineIsCreator = true;
@@ -2909,9 +2913,9 @@
             - dificíl: mejor anticipación, reacción rápida, mayor velocidad
         */
         var DIFFICULTY = {
-            facil:   { maxSpeed: 46, detect: 320, predTime: 0.55, speedNoise: 0.10, steerNoise: 0.020, react: 8, chaseSpeed: 40 },
-            normal:  { maxSpeed: 55, detect: 420, predTime: 0.80, speedNoise: 0.05, steerNoise: 0.012, react: 10, chaseSpeed: 48 },
-            dificil: { maxSpeed: 63, detect: 520, predTime: 1.15, speedNoise: 0.02, steerNoise: 0.006, react: 14, chaseSpeed: 56 }
+            facil:   { maxSpeed: 46, detect: 320, predTime: 0.55, speedNoise: 0.10, steerNoise: 0.020, react: 8, chaseSpeed: 40, captureHits: 2 },
+            normal:  { maxSpeed: 55, detect: 420, predTime: 0.80, speedNoise: 0.05, steerNoise: 0.012, react: 10, chaseSpeed: 48, captureHits: 2 },
+            dificil: { maxSpeed: 63, detect: 520, predTime: 1.15, speedNoise: 0.02, steerNoise: 0.006, react: 14, chaseSpeed: 56, captureHits: 3 }
         };
 
         var chaseWon = false;          // resultado de la persecución (fugitivo)
@@ -2940,6 +2944,9 @@
             chase.detNotify = 0;
             chase.catchTimer = 0;
             chaseWon = false;
+            policeHits = 0;
+            policeHitCooldown = 0;
+            fugitiveFlash = 0;
         }
 
         function clearChase() {
@@ -3233,21 +3240,11 @@
                     }
                 }
             } else if (gameMode === 'policia') {
-                // El jugador persigue al fugitivo (bot)
+                // El jugador persigue al fugitivo (bot) — captura por choques (checkPoliceCollision).
                 var fug = fugitiveCars();
                 if (fug.length) {
                     var fd = botDistToPlayer(fug[0]);
                     if (!chase.active && fd < 900) { chase.active = true; feedText('🚨 PERSECUCIÓN ACTIVA', '#ff6b6b'); chaseBeepToggle(); }
-                    if (chase.active && fd < 26) {
-                        chase.detAccum += dt;
-                        if (chase.detAccum > 2.8) {
-                            chaseWon = true;    // capturado
-                            showResultScreen(); // detennido
-                            return;
-                        }
-                    } else {
-                        chase.detAccum = Math.max(0, chase.detAccum - dt * 0.5);
-                    }
                     // Si el fugitivo queda MUY lejos se escapa → el jugador PIERDE.
                     if (fd > 420) {
                         chase.farTimer += dt;
@@ -3735,19 +3732,41 @@
                 ab.style.background = color;
             } else if (gameMode === 'policia') {
                 document.getElementById('hudPolice').textContent = fugitiveCars().length;
-                // Nivel de distancia al fugitivo: CERCA / MEDIA / LEJOS + barra.
+                // Panel derecho: CHOQUES para capturar + distancia al fugitivo.
                 var fg = fugitiveCars();
                 if (fg.length) {
                     var fDist = botDistToPlayer(fg[0]);
-                    document.getElementById('hudRightTitle').textContent = '📡 FUGITIVO';
-                    var lvTxt, fpct, fcol;
-                    if (fDist < 60)        { lvTxt = 'CERCA';    fpct = 100; fcol = '#ff3b3b'; }
-                    else if (fDist < 200)  { lvTxt = 'MEDIA';    fpct = 60;  fcol = '#fbbf24'; }
-                    else                   { lvTxt = 'LEJOS';    fpct = 25;  fcol = '#4ade80'; }
-                    document.getElementById('hudAlertLevel').textContent = lvTxt + ' · ' + Math.round(fDist) + ' m';
+                    var diff2 = DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal;
+                    var needed = diff2.captureHits || 2;
+                    document.getElementById('hudRightTitle').textContent = '💥 CHOQUES';
+                    var lvDist;
+                    if (fDist < 60)      lvDist = 'CERCA';
+                    else if (fDist < 200) lvDist = 'MEDIA';
+                    else                  lvDist = 'LEJOS';
+                    document.getElementById('hudAlertLevel').textContent = policeHits + '/' + needed + '  · ' + lvDist + ' ' + Math.round(fDist) + 'm';
                     var fab = document.getElementById('hudAlertBar');
-                    fab.style.width = fpct + '%';
-                    fab.style.background = fcol;
+                    fab.style.width = Math.min(100, (policeHits / needed) * 100) + '%';
+                    fab.style.background = policeHits >= needed ? '#ff3b3b' : (policeHits > 0 ? '#ffb84d' : '#4ade80');
+                }
+                // Flash visual del fugitivo tras impacto
+                if (fugitiveFlash > 0) {
+                    fugitiveFlash -= 1/60;
+                    var flashOn = Math.floor(fugitiveFlash * 10) % 2 === 0;
+                    fg.forEach(function(fgB) {
+                        fgB.group.traverse(function(ch) {
+                            if (ch.isMesh && ch.material && ch.material.emissive) {
+                                ch.material.emissive.setHex(flashOn ? 0xff4444 : 0x000000);
+                            }
+                        });
+                    });
+                } else {
+                    fg.forEach(function(fgB) {
+                        fgB.group.traverse(function(ch) {
+                            if (ch.isMesh && ch.material && ch.material.emissive) {
+                                ch.material.emissive.setHex(0x000000);
+                            }
+                        });
+                    });
                 }
             } else if (gameMode === 'online') {
                 var oppCount = Object.keys(onlineOpps).length;
@@ -3983,6 +4002,52 @@
                 feedText('🔥 ¡TURBO!', '#ff9d2b');
             }
         }
+
+        // Choque del jugador contra el fugitivo en modo policía: separa ambos carros
+        // y cuenta impactos para la captura (2 en fácil/normal, 3 en difícil).
+        function checkPoliceCollision(dt) {
+            if (gameMode !== 'policia' || !car || !gameStarted || gameEnded) return;
+            var fug = fugitiveCars();
+            if (!fug.length) return;
+            var fb = fug[0];
+            var dx = car.position.x - fb.x;
+            var dz = car.position.z - fb.z;
+            var dist2 = dx * dx + dz * dz;
+            var minD = 2.5;              // radio de choque
+            if (dist2 < minD * minD) {
+                var dist = Math.sqrt(dist2);
+                var nx = dist > 0.001 ? dx / dist : (Math.random() - 0.5);
+                var nz = dist > 0.001 ? dz / dist : (Math.random() - 0.5);
+                // Separar ambos: empujar al jugador hacia afuera y al fugitivo en sentido contrario
+                car.position.x = fb.x + nx * minD;
+                car.position.z = fb.z + nz * minD;
+                fb.x -= nx * 2 * dt;
+                fb.z -= nz * 2 * dt;
+                if (fb.group) fb.group.position.set(fb.x, terrainHeight(fb.x, fb.z), fb.z);
+                // Reducir velocidad del jugador tras impacto
+                var V = carState.velocity;
+                var dotV = V.x * nx + V.z * nz;
+                if (dotV < 0) { V.x -= nx * dotV * 1.3; V.z -= nz * dotV * 1.3; }
+                carState.speed *= 0.88;
+                // Contar impacto (con cooldown)
+                if (policeHitCooldown <= 0) {
+                    policeHitCooldown = 1.0;
+                    policeHits++;
+                    fugitiveFlash = 0.5;   // flash visual 0.5s
+                    var diff = DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal;
+                    var needed = diff.captureHits || 2;
+                    feedText('💥 ¡IMPACTO! Choques: ' + policeHits + '/' + needed, '#ffb84d');
+                    if (policeHits >= needed) {
+                        chaseWon = true;
+                        feedText('🚨 ¡FUGITIVO DETENIDO!', '#ff6b6b');
+                        showResultScreen();
+                        return;
+                    }
+                }
+            }
+            if (policeHitCooldown > 0) policeHitCooldown -= dt;
+        }
+
         function updateVehiclePhysics(dt) {
             var S = carState;
             var V = S.velocity;
@@ -4284,6 +4349,8 @@
             for (var w = 0; w < wheels.front.length; w++) {
                 wheels.front[w].rotation.z = S.steerAngle;
             }
+            // Choque contra el fugitivo en modo policía
+            checkPoliceCollision(dt);
         }
 
         function updateCamera(dt) {
