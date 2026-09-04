@@ -2008,7 +2008,7 @@
         // principal. En el resto de modos se muestran todos.
         function applySideRoadsForMode() {
             if (!sideRoadGroups || !sideRoadGroups.length) return;
-            var keep = (gameMode === 'policia') ? 1 : sideRoadGroups.length;
+            var keep = (gameMode === 'online') ? sideRoadGroups.length : 0;
             for (var i = 0; i < sideRoadGroups.length; i++) {
                 var visible = (i < keep);
                 var grp = sideRoadGroups[i];
