@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // Redirigir a la landing page si el usuario entra directo (sin ?play)
+        (function() {
+            if (window.location.search.indexOf('play') === -1) {
+                window.location.replace('landing.html');
+            }
+        })();
+    </script>
     <title>Carro Policia 3D</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -551,10 +559,23 @@
         .tbtn:active { color: #60a5fa; }
         @media (max-width: 700px) {
             #info { font-size: 11px; padding: 6px 12px; }
-            .hud-top { position: absolute; top: 10px; left: 10px; right: 10px; }
-            .hud-bottom { bottom: 150px; }
-            .menu-btn { padding: 14px 14px; }
+            .hud-top { position: absolute; top: 8px; left: 8px; right: 8px; flex-direction: column; gap: 6px; }
+            .hud-panel { min-width: 0; width: 100%; padding: 8px 12px; border-radius: 10px; }
+            .hud-title { font-size: 11px; }
+            .hud-row { font-size: 11px; }
+            .hud-bottom { bottom: 160px; }
+            .menu-inner { padding: 14px; }
+            .menu-btn { padding: 14px 14px; gap: 12px; border-radius: 12px; }
             .menu-btn .icon { width: 44px; height: 44px; font-size: 22px; }
+            .menu-btn .txt strong { font-size: 14px; }
+            .menu-btn .txt small { font-size: 12px; }
+            #touch .tpad { width: 130px; height: 100px; bottom: 16px; border-radius: 16px; }
+            #touch .tpad.l { left: 10px; }
+            #touch .tpad.r { right: 10px; }
+            .tbtn { font-size: 22px; }
+            .speed-val { font-size: 28px; }
+            .turbo-wrap { margin-top: 6px; }
+            .hud-feed { font-size: 13px; bottom: 170px; }
         }
     </style>
 </head>
