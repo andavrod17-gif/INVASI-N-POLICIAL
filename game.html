@@ -569,6 +569,28 @@
             .turbo-wrap { margin-top: 6px; }
             .hud-feed { font-size: 13px; bottom: 170px; }
         }
+
+        /* HUD de pantalla dividida: un panel por jugador sobre cada mitad */
+        #splitHud { position: fixed; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none; z-index: 35; opacity: 1; }
+        #splitHud .shud {
+            position: absolute; left: 12px; background: rgba(8, 10, 20, .58);
+            border-radius: 12px; padding: 8px 12px; color: #fff;
+            font: 700 12px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+            backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+        }
+        #splitHud .shud b { font-size: 13px; letter-spacing: .4px; }
+        #splitHud .shud .sh-kmh { font-size: 26px; color: #ffd270; font-weight: 800; }
+        #splitHud .shud small { color: #7d8ba1; margin-left: 2px; font-size: 10px; }
+        #splitHud .shud .sh-sub { margin-top: 3px; font-size: 11px; color: #fbbf24; }
+        #splitHud .shud .sh-turbo { width: 140px; height: 6px; background: rgba(255,255,255,.18); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        #splitHud .shud .sh-turbo i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #ff9d2b, #ff5d5d); border-radius: 4px; }
+        #splitHud .shud.shud-top { top: 10px; }
+        #splitHud .shud.shud-bot { bottom: 10px; }
+        @media (max-width: 640px) {
+            #splitHud .shud { left: 8px; padding: 6px 9px; }
+            #splitHud .shud .sh-kmh { font-size: 20px; }
+            #splitHud .shud .sh-turbo { width: 90px; }
+        }
     </style>
 </head>
 <body>
@@ -595,6 +617,11 @@
                 <button class="menu-btn" data-mode="online" id="btnOnline">
                     <span class="icon">🌐</span>
                     <span class="txt"><strong>MULTIJUGADOR EN LÍNEA</strong><small>Enfrenta a otro jugador: policía vs fugitivo.</small></span>
+                    <span class="arrow">›</span>
+                </button>
+                <button class="menu-btn" data-mode="split" id="btnSplit">
+                    <span class="icon">🖥️</span>
+                    <span class="txt"><strong>PANTALLA DIVIDIDA</strong><small>Dos jugadores locales: P1 policía vs P2 fugitivo.</small></span>
                     <span class="arrow">›</span>
                 </button>
             </div>
@@ -721,6 +748,22 @@
                 <span class="turbo-label">🔥 TURBO [Q]</span>
                 <div class="bar turbar"><i id="hudTurbo" style="width:0%"></i></div>
             </div>
+        </div>
+    </div>
+
+    <!-- HUD de pantalla dividida -->
+    <div id="splitHud" style="display:none">
+        <div class="shud shud-top">
+            <b>P1 🚓 POLICÍA</b><br>
+            <span class="sh-kmh" id="spd1">0</span><small>km/h</small>
+            <div class="sh-sub" id="sh1">💥 0/2</div>
+            <div class="sh-turbo"><i id="st1"></i></div>
+        </div>
+        <div class="shud shud-bot">
+            <b>P2 🏎️ FUGITIVO</b><br>
+            <span class="sh-kmh" id="spd2">0</span><small>km/h</small>
+            <div class="sh-sub" id="sh2">📍 — m</div>
+            <div class="sh-turbo"><i id="st2"></i></div>
         </div>
     </div>
 
@@ -1971,11 +2014,12 @@
             selectPendingMode = mode;
             menuEl.classList.add('hidden');
             selectEl.classList.remove('hidden');
-            var titles = { fugitivo: '🚨 SER FUGITIVO', policia: '🚓 SER POLICÍA', libre: '🏎️ CONDUCCIÓN LIBRE' };
+            var titles = { fugitivo: '🚨 SER FUGITIVO', policia: '🚓 SER POLICÍA', libre: '🏎️ CONDUCCIÓN LIBRE', split: '🖥️ PANTALLA DIVIDIDA' };
             var subs = {
                 fugitivo: 'Escapa de la policía y sobrevive el mayor tiempo posible.',
                 policia: 'Persigue al fugitivo y consigue detenerlo.',
-                libre: 'Explora el mapa sin límites.'
+                libre: 'Explora el mapa sin límites.',
+                split: 'P1 = 🚓 Policía (arriba) · P2 = 🏎️ Fugitivo (abajo). La persecución en una sola pantalla.'
             };
             document.getElementById('selTitle').textContent = titles[mode];
             document.getElementById('selSub').textContent = subs[mode];
@@ -2022,7 +2066,7 @@
         // principal. En el resto de modos se muestran todos.
         function applySideRoadsForMode() {
             if (!sideRoadGroups || !sideRoadGroups.length) return;
-            var keep = (gameMode === 'online') ? sideRoadGroups.length : 0;
+            var keep = (gameMode === 'online' || gameMode === 'split') ? sideRoadGroups.length : 0;
             for (var i = 0; i < sideRoadGroups.length; i++) {
                 var visible = (i < keep);
                 var grp = sideRoadGroups[i];
@@ -2059,6 +2103,11 @@
                 return;
             }
 
+            if (mode === 'split') {
+                startSplit();
+                return;
+            }
+
             // Construir el carro del jugador según el modo
             var isPolice = (mode === 'policia');
             setupPlayerCar(isPolice ? 'policia' : 'carreras', isPolice);
@@ -2089,6 +2138,7 @@
         function backToMenu() {
             gameStarted = false;
             gameEnded = false;
+            teardownSplit();
             removeBots();
             removeOppCar();
             closeOnline();
@@ -2722,6 +2772,7 @@
             gameEnded = true;
             hudEl.classList.remove('visible');
             document.getElementById('touch').classList.remove('on');
+            if (splitActive) document.getElementById('splitHud').style.display = 'none';
             removeBots();
             clearChase();
 
@@ -2776,6 +2827,19 @@
                 stats.push(statRow('Distancia recorrida', km.toFixed(2) + ' km'));
                 stats.push(statRow('Velocidad máxima', Math.round(runStats.topSpeedKmh) + ' km/h'));
                 stats.push(statRow('Colisiones', runStats.collisions));
+            } else if (gameMode === 'split') {
+                if (splitResult === 0) {
+                    emoji = '🚓';
+                    title = '¡P1 DETUVO AL FUGITIVO!';
+                    sub = 'P2 fue atrapado en pantalla dividida';
+                } else {
+                    emoji = '🏆';
+                    title = '¡P2 ESCAPÓ!';
+                    sub = 'P2 dejó atrás a la policía en pantalla dividida';
+                }
+                stats.push(statRow('Tiempo de persecución', timeStr));
+                stats.push(statRow('Vel. máx. P1 (policía)', Math.round(splitPlayers[0] ? splitPlayers[0].topKmh : 0) + ' km/h'));
+                stats.push(statRow('Vel. máx. P2 (fugitivo)', Math.round(splitPlayers[1] ? splitPlayers[1].topKmh : 0) + ' km/h'));
             } else {
                 emoji = '🏎️';
                 title = 'CONDUCCIÓN COMPLETADA';
@@ -3857,6 +3921,7 @@
         var camSnap = true;
 
         document.addEventListener('keydown', function (e) {
+            if (splitActive) return;
             keys[e.key.toLowerCase()] = true;
             var prevCam = camMode;
             if (e.key === 'c' || e.key === 'C') { camMode = (camMode % camCount) + 1; }
@@ -3867,7 +3932,7 @@
             if ((e.key === 'f' || e.key === 'F') && sirenSpot) { sirenOn = !sirenOn; }
             if ((e.key === 'q' || e.key === 'Q') && car && gameStarted && !gameEnded) { activateTurbo(); }
         });
-        document.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; if ((e.key === 'q' || e.key === 'Q')) turboActive = false; });
+        document.addEventListener('keyup', function (e) { if (splitActive) return; keys[e.key.toLowerCase()] = false; if ((e.key === 'q' || e.key === 'Q')) turboActive = false; });
 
         renderer.domElement.addEventListener('mousedown', function (e) {
             if (e.button === 0) { mouseDown = true; lastMouseX = e.clientX; }
@@ -4059,7 +4124,16 @@
             if (policeHitCooldown > 0) policeHitCooldown -= dt;
         }
 
-        function updateVehiclePhysics(dt) {
+        function updateVehiclePhysics(dt, pc) {
+            // En pantalla dividida se simula un coche por jugador: se intercambian
+            // temporalmente las variables globales y se restauran al terminar.
+            var gCar = car, gState = carState, gKeys = keys, gWheels = wheels;
+            var gTC = turboCharge, gTA = turboActive, gTT = turboTimer, gDM = driftMeter;
+            if (pc) {
+                car = pc.car; carState = pc.state; keys = pc.keys; wheels = pc.wheels;
+                turboCharge = pc.turboCharge; turboActive = pc.turboActive;
+                turboTimer = pc.turboTimer; driftMeter = pc.driftMeter;
+            }
             var S = carState;
             var V = S.velocity;
             var cfg = VehicleConfig;
@@ -4362,6 +4436,13 @@
             }
             // Choque contra el fugitivo en modo policía
             checkPoliceCollision(dt);
+
+            if (pc) {
+                pc.turboCharge = turboCharge; pc.turboActive = turboActive;
+                pc.turboTimer = turboTimer; pc.driftMeter = driftMeter;
+                car = gCar; carState = gState; keys = gKeys; wheels = gWheels;
+                turboCharge = gTC; turboActive = gTA; turboTimer = gTT; driftMeter = gDM;
+            }
         }
 
         function updateCamera(dt) {
@@ -4447,7 +4528,7 @@
             var dt = Math.min((now - lastTime) / 1000, 0.05);
             lastTime = now;
 
-            if (car && gameStarted) {
+            if (gameStarted && (car || splitActive)) {
                 // Cuenta regresiva de inicio (3-2-1): el coche no se mueve hasta el ¡YA!
                 if (onlineCount > 0) {
                     onlineCountT += dt;
@@ -4467,15 +4548,22 @@
                         feedText('🟢 ¡CORRE!', '#4ade80');
                         setTimeout(function () { onlineCountEl.style.display = 'none'; }, 900);
                     }
-                    // Mantener el coche en reposo durante la cuenta
-                    carState.velocity.set(0, 0, 0);
-                    carState.speed = 0;
-                    carState.yawRate = 0;
-                    if (gameMode === 'online') {
-                        updateHud(dt);
-                        updateCamera(dt);
-                        renderer.render(scene, camera);
+                    if (splitActive) {
+                        updateSplitCameras(dt);
+                        renderSplit();
+                    } else {
+                        // Mantener el coche en reposo durante la cuenta
+                        carState.velocity.set(0, 0, 0);
+                        carState.speed = 0;
+                        carState.yawRate = 0;
+                        if (gameMode === 'online') {
+                            updateHud(dt);
+                            updateCamera(dt);
+                            renderer.render(scene, camera);
+                        }
                     }
+                } else if (splitActive) {
+                    updateSplit(dt);
                 } else {
                     updateVehiclePhysics(dt);
                     if (gameMode !== 'online') {
@@ -4496,7 +4584,7 @@
                     updateCamera(dt);
                 }
 
-                if (sirenOn) {
+                if (!splitActive && sirenOn) {
                     sirenElapsed += dt;
                     var cycle = sirenElapsed % 2.0;
                     var phase = cycle < 1.0 ? 0 : 1;
@@ -4521,7 +4609,7 @@
                     if (audioCtx && sirenGain) sirenGain.gain.value = 0;
                 }
 
-                if (audioCtx && engineOsc && engineGain) {
+                if (!splitActive && audioCtx && engineOsc && engineGain) {
                     if (audioCtx.state === 'suspended') audioCtx.resume();
                     var engineSpeed = Math.abs(carState.speed);
                     var throttle = (keys['w'] ? 1 : 0) - (keys['s'] ? 0.4 : 0) * 0;
@@ -4553,15 +4641,354 @@
             }
 
             // La luz del carro lo sigue para que el modelo quede bien iluminado en todo ángulo
-            if (car) {
+            if (splitActive && splitPlayers[0]) {
+                carLight.position.set(splitPlayers[0].car.position.x, splitPlayers[0].car.position.y + 8, splitPlayers[0].car.position.z - 4);
+                if (splitLight2 && splitPlayers[1]) {
+                    splitLight2.position.set(splitPlayers[1].car.position.x, splitPlayers[1].car.position.y + 8, splitPlayers[1].car.position.z - 4);
+                }
+            } else if (car) {
                 carLight.position.set(car.position.x, car.position.y + 8, car.position.z - 4);
             }
 
             // Actualizar partículas (astillas de las barreras destruidas)
             if (woodParticles.length > 0) updateParticles(dt);
 
-            renderer.render(scene, camera);
+            if (!splitActive) renderer.render(scene, camera);
         }
+        // ===== MODO PANTALLA DIVIDIDA (2 jugadores locales) =====
+        var splitActive = false;
+        var splitPlayers = [];
+        var splitResult = null;        // 0 = P1 (policía) gana · 1 = P2 (fugitivo) gana
+        var cam2 = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 4000);
+        var splitLight2 = null;
+
+        // Mapeo de teclas físicas (e.code) → [jugador, tecla semántica]
+        var splitKeyMap = {
+            'KeyW': [0, 'w'], 'KeyA': [0, 'a'], 'KeyS': [0, 's'], 'KeyD': [0, 'd'],
+            'ShiftLeft': [0, 'shift'], 'KeyQ': [0, 'q'], 'KeyF': [0, 'siren'],
+            'ArrowUp': [1, 'w'], 'ArrowLeft': [1, 'a'], 'ArrowDown': [1, 's'], 'ArrowRight': [1, 'd'],
+            'ShiftRight': [1, 'shift'], 'KeyP': [1, 'q']
+        };
+
+        function splitSetKey(code, val) {
+            if (!splitActive) return;
+            var m = splitKeyMap[code];
+            if (!m) return;
+            var P = splitPlayers[m[0]];
+            if (!P) return;
+            P.keys[m[1]] = val;
+            if (val && m[1] === 'q') activateSplitTurbo(m[0]);
+            if (val && m[1] === 'siren') { if (P.sirenSpot) P.sirenOn = !P.sirenOn; }
+        }
+        document.addEventListener('keydown', function (e) { if (e.repeat) return; splitSetKey(e.code, true); });
+        document.addEventListener('keyup', function (e) {
+            if (!splitActive) return;
+            var m = splitKeyMap[e.code];
+            if (!m) return;
+            var P = splitPlayers[m[0]];
+            if (!P) return;
+            P.keys[m[1]] = false;
+            if (m[1] === 'q') P.active = false;
+        });
+
+        function buildSplitCar(modelKey, isPolice) {
+            var src = carModels[modelKey];
+            if (!src) return null;
+            var pivot = new THREE.Group();
+            var mdl = src.clone(true);
+            var wh = { all: [], front: [], rear: [] };
+            mdl.traverse(function (ch) {
+                if (ch.isMesh) {
+                    ch.castShadow = true;
+                    ch.receiveShadow = true;
+                    if (ch.material) ch.material = ch.material.clone();
+                    var n = (ch.name || '').toLowerCase();
+                    if (n.indexOf('whell') >= 0) wh.all.push(ch);
+                }
+            });
+            pivot.add(mdl);
+            scene.add(pivot);
+            for (var i = 0; i < wh.all.length; i++) {
+                var wc = wh.all[i];
+                if (!wc.geometry) continue;
+                var geo = wc.geometry.clone();
+                wc.geometry = geo;
+                geo.computeBoundingBox();
+                var bb = geo.boundingBox;
+                var c = new THREE.Vector3();
+                bb.getCenter(c);
+                geo.translate(-c.x, -c.y, -c.z);
+                wc.position.x += c.x;
+                wc.position.y += c.y;
+                wc.position.z += c.z;
+            }
+            wh.front = [wh.all[0], wh.all[3]];
+            wh.rear = [wh.all[1], wh.all[2]];
+            var P = {
+                car: pivot,
+                state: { velocity: new THREE.Vector3(), yawRate: 0, heading: 0, steerAngle: 0, speed: 0 },
+                wheels: wh,
+                keys: {},
+                charge: 0, active: false, timer: 0, driftMeter: 0,
+                isPolice: !!isPolice,
+                hits: 0, hitCooldown: 0, flash: 0,
+                sirenSpot: null, sirenOn: false, sirenElapsed: 0,
+                camPos: new THREE.Vector3(), camLook: new THREE.Vector3(), camSnap: true,
+                camOrbit: 0, camDist: 8, camHeight: 3.4,
+                topKmh: 0
+            };
+            if (isPolice) {
+                var roofH = src.roofHeight || 1.0;
+                P.sirenSpot = new THREE.PointLight(0xff2222, 0, 40, 2);
+                P.sirenSpot.position.set(0, roofH + 0.4, 0.2);
+                P.car.add(P.sirenSpot);
+            }
+            return P;
+        }
+
+        function teardownSplitCars() {
+            for (var i = 0; i < splitPlayers.length; i++) {
+                var P = splitPlayers[i];
+                if (P && P.car) { scene.remove(P.car); P.car = null; }
+            }
+            splitPlayers = [];
+        }
+
+        function teardownSplit() {
+            teardownSplitCars();
+            if (splitLight2) { scene.remove(splitLight2); splitLight2 = null; }
+            splitActive = false;
+            splitResult = null;
+            var sh = document.getElementById('splitHud');
+            if (sh) sh.style.display = 'none';
+            document.getElementById('info').innerHTML = 'W <span style="color:#aaa">adelante</span> | A/D <span style="color:#aaa">girar</span> | S <span style="color:#aaa">freno/reversa</span> | Shift <span style="color:#aaa">derrapar</span> | F <span style="color:#aaa">sirena</span> | C o 1/2/3 <span style="color:#aaa">cámaras</span> | ESC <span style="color:#aaa">menú</span>';
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setScissorTest(false);
+            onlineCount = 0;
+            onlineCountEl.style.display = 'none';
+        }
+
+        function startSplit() {
+            teardownSplitCars();
+            if (splitLight2) { scene.remove(splitLight2); splitLight2 = null; }
+            gameMode = 'split';
+            applySideRoadsForMode();
+            gameEnded = false;
+            splitResult = null;
+            runStats.time = 0;
+            runStats.dist = 0;
+            runStats.topSpeedKmh = 0;
+            chase.escapeAccum = 0;
+            chase.farTimer = 0;
+
+            var p1 = buildSplitCar('policia', true);
+            var p2 = buildSplitCar('carreras', false);
+            if (!p1 || !p2) { splitActive = false; openMenu(); return; }
+            splitPlayers = [p1, p2];
+            splitActive = true;
+
+            // Posiciones de salida: P1 (policía) al inicio, P2 (fugitivo) 36 m adelante.
+            p1.car.position.set(0, terrainHeight(0, -860), -860);
+            p1.state.heading = Math.atan2(200, 70);
+            p1.state.velocity.set(0, 0, 0);
+            p1.state.yawRate = 0;
+            p1.state.speed = 0;
+            var fwd = new THREE.Vector3(Math.sin(p1.state.heading), 0, Math.cos(p1.state.heading));
+            var sx = fwd.x * 36, sz = -860 + fwd.z * 36;
+            p2.car.position.set(sx, terrainHeight(sx, sz), sz);
+            p2.state.heading = p1.state.heading;
+            p2.state.velocity.set(0, 0, 0);
+            p2.state.yawRate = 0;
+            p2.state.speed = 0;
+            p1.camSnap = true;
+            p2.camSnap = true;
+
+            splitLight2 = new THREE.PointLight(0xffffff, 0.9, 60);
+            scene.add(splitLight2);
+
+            gameStarted = true;
+            hudEl.classList.remove('visible');
+            document.getElementById('touch').classList.remove('on');
+            document.getElementById('splitHud').style.display = '';
+            document.getElementById('hudFeed').textContent = '';
+            document.getElementById('hudFeed').style.opacity = 0;
+            document.getElementById('info').textContent = 'P1: WASD · Shift izq derrape · Q turbo · F sirena      |      P2: Flechas · Shift der derrape · P turbo';
+
+            // Cuenta regresiva 3-2-1 compartida
+            onlineCount = 3;
+            onlineCountT = 0;
+            onlineShown = 0;
+            onlineCountEl.classList.remove('go');
+            onlineCountEl.style.display = 'block';
+            onlineCountEl.textContent = '3';
+            feedText('🖥️ ¡PANTALLA DIVIDIDA!', '#60a5fa');
+            updateSplitCameras(0.016);
+            renderSplit();
+        }
+
+        function activateSplitTurbo(i) {
+            var P = splitPlayers[i];
+            if (!P || gameEnded) return;
+            if (P.charge <= 0) { feedText('⚠️ P' + (i + 1) + ' sin turbo — derrapa (Shift) para recargar', '#7d8ba1'); return; }
+            if (P.state.speed < VehicleConfig.turboMinSpeed) { feedText('⚠️ P' + (i + 1) + ': acelera antes de usar el turbo', '#7d8ba1'); return; }
+            if (!P.active) { P.active = true; P.timer = 0; feedText('🔥 ¡TURBO de P' + (i + 1) + '!', '#ff9d2b'); }
+        }
+
+        function updateSplit(dt) {
+            if (!splitActive || !splitPlayers[0] || !splitPlayers[1]) return;
+            var P1 = splitPlayers[0], P2 = splitPlayers[1];
+            var pc1 = { car: P1.car, state: P1.state, keys: P1.keys, wheels: P1.wheels, turboCharge: P1.charge, turboActive: P1.active, turboTimer: P1.timer, driftMeter: P1.driftMeter };
+            updateVehiclePhysics(dt, pc1);
+            P1.charge = pc1.turboCharge; P1.active = pc1.turboActive; P1.timer = pc1.turboTimer; P1.driftMeter = pc1.driftMeter;
+            var pc2 = { car: P2.car, state: P2.state, keys: P2.keys, wheels: P2.wheels, turboCharge: P2.charge, turboActive: P2.active, turboTimer: P2.timer, driftMeter: P2.driftMeter };
+            updateVehiclePhysics(dt, pc2);
+            P2.charge = pc2.turboCharge; P2.active = pc2.turboActive; P2.timer = pc2.turboTimer; P2.driftMeter = pc2.driftMeter;
+            checkSplitCollision(dt);
+            checkSplitEscape(dt);
+            updateSplitHud(dt);
+            updateSplitCameras(dt);
+        }
+
+        function checkSplitCollision(dt) {
+            var A = splitPlayers[0], B = splitPlayers[1];
+            if (!A || !B) return;
+            var dx = A.car.position.x - B.car.position.x;
+            var dz = A.car.position.z - B.car.position.z;
+            var dist2 = dx * dx + dz * dz;
+            var minD = 2.5;
+            if (dist2 < minD * minD && dist2 > 0.000001) {
+                var dist = Math.sqrt(dist2);
+                var nx = dx / dist, nz = dz / dist;
+                A.car.position.x = B.car.position.x + nx * minD;
+                A.car.position.z = B.car.position.z + nz * minD;
+                B.car.position.x -= nx * 3 * dt;
+                B.car.position.z -= nz * 3 * dt;
+                A.state.speed *= 0.95;
+                B.flash = 0.5;
+                var needed = (DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal).captureHits || 2;
+                if (A.hitCooldown <= 0) {
+                    A.hitCooldown = 1.0;
+                    A.hits++;
+                    feedText('💥 ¡IMPACTO DE P1! Choques: ' + A.hits + '/' + needed, '#ffb84d');
+                    if (A.hits >= needed) {
+                        splitResult = 0;
+                        feedText('🚨 ¡P1 DETUVO AL FUGITIVO!', '#ff6b6b');
+                        showResultScreen();
+                        return;
+                    }
+                }
+            }
+            if (A.hitCooldown > 0) A.hitCooldown -= dt;
+            if (B.flash > 0) {
+                B.flash -= 1 / 60;
+                var flashOn = Math.floor(B.flash * 10) % 2 === 0;
+                B.car.traverse(function (ch) {
+                    if (ch.isMesh && ch.material && ch.material.emissive) ch.material.emissive.setHex(flashOn ? 0xff4444 : 0x000000);
+                });
+            }
+        }
+
+        function checkSplitEscape(dt) {
+            var A = splitPlayers[0], B = splitPlayers[1];
+            if (!A || !B) return;
+            var ddx = A.car.position.x - B.car.position.x;
+            var ddz = A.car.position.z - B.car.position.z;
+            var dd = Math.sqrt(ddx * ddx + ddz * ddz);
+            if (dd > 420) {
+                chase.escapeAccum += dt;
+                if (chase.escapeAccum - dt < 0.4 && chase.escapeAccum <= 1.0) feedText('⚠️ ¡EL FUGITIVO SE ALEJA!', '#fbbf24');
+                if (chase.escapeAccum > 3.5) {
+                    splitResult = 1;
+                    feedText('💨 ¡P2 ESCAPÓ!', '#4ade80');
+                    showResultScreen();
+                }
+            } else {
+                chase.escapeAccum = Math.max(0, chase.escapeAccum - dt * 0.5);
+            }
+        }
+
+        function updateSplitHud(dt) {
+            runStats.time += dt;
+            if (chase.detNotify > 0) {
+                chase.detNotify -= dt;
+                if (chase.detNotify <= 0) document.getElementById('hudFeed').style.opacity = 0;
+            }
+            var needed = (DIFFICULTY[pendingDifficulty] || DIFFICULTY.normal).captureHits || 2;
+            for (var i = 0; i < 2; i++) {
+                var P = splitPlayers[i];
+                if (!P) continue;
+                var kmh = Math.abs(P.state.speed) * 3.6;
+                if (kmh > P.topKmh) P.topKmh = kmh;
+                if (i === 0) {
+                    document.getElementById('spd1').textContent = Math.round(kmh);
+                    document.getElementById('sh1').textContent = '💥 ' + P.hits + '/' + needed;
+                    document.getElementById('st1').style.width = (P.charge * 100) + '%';
+                } else {
+                    document.getElementById('spd2').textContent = Math.round(kmh);
+                    var dP = splitPlayers[0].car.position.distanceTo(P.car.position);
+                    document.getElementById('sh2').textContent = '📍 ' + Math.round(dP) + ' m';
+                    document.getElementById('st2').style.width = (P.charge * 100) + '%';
+                }
+            }
+        }
+
+        function updateSplitCameras(dt) {
+            var w = window.innerWidth, h = window.innerHeight;
+            var h2 = Math.max(1, Math.floor(h / 2));
+            for (var i = 0; i < 2; i++) {
+                var P = splitPlayers[i];
+                if (!P) continue;
+                var cam = (i === 0) ? camera : cam2;
+                cam.aspect = w / h2;
+                cam.updateProjectionMatrix();
+                var yaw = P.state.heading + P.camOrbit;
+                var desiredPos = new THREE.Vector3(
+                    P.car.position.x - Math.sin(yaw) * P.camDist,
+                    P.car.position.y + P.camHeight,
+                    P.car.position.z - Math.cos(yaw) * P.camDist
+                );
+                var desiredLook = new THREE.Vector3(
+                    P.car.position.x + Math.sin(P.state.heading) * 1.2,
+                    P.car.position.y + 0.8,
+                    P.car.position.z + Math.cos(P.state.heading) * 1.2
+                );
+                if (!P.camPos.length() || P.camSnap) {
+                    P.camPos.copy(desiredPos);
+                    P.camLook.copy(desiredLook);
+                    P.camSnap = false;
+                }
+                P.camPos.lerp(desiredPos, 0.3);
+                P.camLook.lerp(desiredLook, 0.3);
+                cam.position.copy(P.camPos);
+                cam.lookAt(P.camLook);
+            }
+            var P1 = splitPlayers[0];
+            if (P1 && P1.sirenSpot) {
+                if (P1.sirenOn) {
+                    P1.sirenElapsed += dt;
+                    var phase = (P1.sirenElapsed % 2.0) < 1.0 ? 0 : 1;
+                    P1.sirenSpot.color.setHex(phase === 0 ? 0xff2222 : 0x2266ff);
+                    P1.sirenSpot.intensity = 3.5;
+                } else {
+                    P1.sirenSpot.intensity = 0;
+                }
+            }
+        }
+
+        function renderSplit() {
+            var w = window.innerWidth, h = window.innerHeight;
+            var h2 = Math.max(1, Math.floor(h / 2));
+            renderer.setScissorTest(true);
+            renderer.setViewport(0, h - h2, w, h2);
+            renderer.setScissor(0, h - h2, w, h2);
+            renderer.render(scene, camera);
+            renderer.setViewport(0, 0, w, h - h2);
+            renderer.setScissor(0, 0, w, h - h2);
+            renderer.render(scene, cam2);
+            renderer.setScissorTest(false);
+        }
+
         animate();
     </script>
 </body>
