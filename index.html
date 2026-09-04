@@ -834,8 +834,9 @@
             new THREE.Vector3(-720, 0, -520),   // suavizada: más abierta
             new THREE.Vector3(-540, 0, -680),   // suavizada: más amplia
             new THREE.Vector3(-340, 0, -800),
-            new THREE.Vector3(-160, 0, -860),
-            new THREE.Vector3(0, 0, -870)       // cierra suave hacia el punto 0 (sur)
+            new THREE.Vector3(-160, 0, -850),
+            new THREE.Vector3(60, 0, -830),
+            new THREE.Vector3(120, 0, -860)        // cierra suave hacia el punto 0 (sur)
         ], true);
         // Alinear la altura de la carretera con el terreno en cada punto de control
         for (var cc = 0; cc < roadCurve.points.length; cc++) {
