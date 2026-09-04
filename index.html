@@ -4021,14 +4021,11 @@
                 // Separar ambos: empujar al jugador hacia afuera y al fugitivo en sentido contrario
                 car.position.x = fb.x + nx * minD;
                 car.position.z = fb.z + nz * minD;
-                fb.x -= nx * 2 * dt;
-                fb.z -= nz * 2 * dt;
+                fb.x -= nx * 3 * dt;
+                fb.z -= nz * 3 * dt;
                 if (fb.group) fb.group.position.set(fb.x, terrainHeight(fb.x, fb.z), fb.z);
-                // Reducir velocidad del jugador tras impacto
-                var V = carState.velocity;
-                var dotV = V.x * nx + V.z * nz;
-                if (dotV < 0) { V.x -= nx * dotV * 1.3; V.z -= nz * dotV * 1.3; }
-                carState.speed *= 0.88;
+                // Sin rebote: el jugador atraviesa al fugitivo con solo una leve frenada
+                carState.speed *= 0.95;
                 // Contar impacto (con cooldown)
                 if (policeHitCooldown <= 0) {
                     policeHitCooldown = 1.0;
