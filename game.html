@@ -820,8 +820,9 @@
         sun.shadow.camera.right = 500;
         sun.shadow.camera.top = 500;
         sun.shadow.camera.bottom = -500;
-        sun.shadow.bias = -0.001;
-        scene.add(sun);
+sun.shadow.bias = -0.001;
+            sun.shadow.autoUpdate = false;
+            scene.add(sun);
 
         var hemi = new THREE.HemisphereLight(0xdff0ff, 0x4a7a4a, 1.1);
         scene.add(hemi);
@@ -3912,6 +3913,10 @@
         var engineOsc2 = null;
         var engineFilter = null;
         var engineGain = null;
+        var engineOscB = null;
+        var engineOsc2B = null;
+        var engineFilterB = null;
+        var engineGainB = null;
         var currentGear = 1;
         var gearShiftTimer = 0;
         var lastEngineRpm = 0;
@@ -4026,6 +4031,44 @@
             engineGain.connect(audioCtx.destination);
             engineOsc.start();
             engineOsc2.start();
+
+            // Segunda voz (jugador P2 en pantalla dividida)
+            engineOscB = audioCtx.createOscillator();
+            engineOscB.type = 'sawtooth';
+            engineOscB.frequency.value = 40;
+            engineOsc2B = audioCtx.createOscillator();
+            engineOsc2B.type = 'square';
+            engineOsc2B.frequency.value = 80;
+            engineFilterB = audioCtx.createBiquadFilter();
+            engineFilterB.type = 'lowpass';
+            engineFilterB.frequency.value = 800;
+            engineGainB = audioCtx.createGain();
+            engineGainB.gain.value = 0.0;
+            engineOscB.connect(engineFilterB);
+            engineOsc2B.connect(engineFilterB);
+            engineFilterB.connect(engineGainB);
+            engineGainB.connect(audioCtx.destination);
+            engineOscB.start();
+            engineOsc2B.start();
+        }
+
+        // Voz de motor compartida entre jugadores: sube/baja tono con rpm y velocidad
+        function applyEngineVoice(os1, os2, gain, filter, vo, spd, thro, dtn) {
+            var gearStep = [0, 11, 22, 33, 44, 55][Math.min(vo.gear, 5)];
+            var rpmInGear = 500 + Math.max(0, spd - gearStep) * 30 + thro * 800;
+            if (vo.shift > 0) {
+                vo.shift -= dtn;
+                rpmInGear = 700 + vo.shift * 300;
+                os1.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.02);
+                os2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.02);
+            } else {
+                if (thro > 0 && rpmInGear > 4200 && vo.gear < 5) { vo.gear++; vo.shift = 0.4; }
+                if (thro <= 0 && rpmInGear < 1500 && vo.gear > 1) { vo.gear--; }
+                os1.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.05);
+                os2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.05);
+            }
+            filter.frequency.setTargetAtTime(300 + rpmInGear, audioCtx.currentTime, 0.05);
+            gain.gain.value = 0.005 + Math.min(spd * 0.0002, 0.01) + (thro > 0 ? 0.003 : 0);
         }
 
         // Silencia TODO el audio del juego (motor, sirena). Se usa al volver al menú
@@ -4033,6 +4076,7 @@
         function silenceGameAudio() {
             if (!audioCtx) return;
             if (engineGain) engineGain.gain.value = 0;
+            if (engineGainB) engineGainB.gain.value = 0;
             if (sirenGain) sirenGain.gain.value = 0;
         }
 
@@ -4527,6 +4571,7 @@
             var now = performance.now();
             var dt = Math.min((now - lastTime) / 1000, 0.05);
             lastTime = now;
+            sun.shadow.needsUpdate = true;
 
             if (gameStarted && (car || splitActive)) {
                 // Cuenta regresiva de inicio (3-2-1): el coche no se mueve hasta el ¡YA!
@@ -4584,7 +4629,20 @@
                     updateCamera(dt);
                 }
 
-                if (!splitActive && sirenOn) {
+                if (splitActive && splitPlayers[0] && audioCtx && sirenOsc && sirenGain) {
+                    var sP1 = splitPlayers[0];
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    if (sP1.sirenOn) {
+                        sirenGain.gain.value = 0.3;
+                        var sCycle = sP1.sirenElapsed % 1.6;
+                        var wFreq;
+                        if (sCycle < 0.8) { wFreq = 500 + (900 - 500) * (sCycle / 0.8); }
+                        else { wFreq = 900 - (900 - 500) * ((sCycle - 0.8) / 0.8); }
+                        sirenOsc.frequency.setTargetAtTime(wFreq, audioCtx.currentTime, 0.03);
+                    } else {
+                        sirenGain.gain.value = 0;
+                    }
+                } else if (!splitActive && sirenOn) {
                     sirenElapsed += dt;
                     var cycle = sirenElapsed % 2.0;
                     var phase = cycle < 1.0 ? 0 : 1;
@@ -4609,34 +4667,40 @@
                     if (audioCtx && sirenGain) sirenGain.gain.value = 0;
                 }
 
-                if (!splitActive && audioCtx && engineOsc && engineGain) {
+                if (audioCtx && engineOsc && engineGain) {
                     if (audioCtx.state === 'suspended') audioCtx.resume();
-                    var engineSpeed = Math.abs(carState.speed);
-                    var throttle = (keys['w'] ? 1 : 0) - (keys['s'] ? 0.4 : 0) * 0;
+                    if (splitActive && splitPlayers[0] && splitPlayers[1] && engineGainB) {
+                        applyEngineVoice(engineOsc, engineOsc2, engineGain, engineFilter, splitPlayers[0].gearState, Math.abs(splitPlayers[0].state.speed), (splitPlayers[0].keys['w'] ? 1 : 0), dt);
+                        applyEngineVoice(engineOscB, engineOsc2B, engineGainB, engineFilterB, splitPlayers[1].gearState, Math.abs(splitPlayers[1].state.speed), (splitPlayers[1].keys['w'] ? 1 : 0), dt);
+                    } else if (!splitActive) {
+                        var engineSpeed = Math.abs(carState.speed);
+                        var throttle = (keys['w'] ? 1 : 0) - (keys['s'] ? 0.4 : 0) * 0;
 
-                    var gearStep = [0, 11, 22, 33, 44, 55][Math.min(currentGear, 5)];
-                    var rpmBase = 500 + (engineSpeed + gearStep * 0) * 15;
-                    var rpmInGear = 500 + Math.max(0, engineSpeed - gearStep) * 30 + throttle * 800;
+                        var gearStep = [0, 11, 22, 33, 44, 55][Math.min(currentGear, 5)];
+                        var rpmBase = 500 + (engineSpeed + gearStep * 0) * 15;
+                        var rpmInGear = 500 + Math.max(0, engineSpeed - gearStep) * 30 + throttle * 800;
 
-                    if (gearShiftTimer > 0) {
-                        gearShiftTimer -= dt;
-                        rpmInGear = 700 + gearShiftTimer * 300;
-                        engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.02);
-                        engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.02);
-                    } else {
-                        if (throttle > 0 && rpmInGear > 4200 && currentGear < 5) {
-                            currentGear++;
-                            gearShiftTimer = 0.4;
+                        if (gearShiftTimer > 0) {
+                            gearShiftTimer -= dt;
+                            rpmInGear = 700 + gearShiftTimer * 300;
+                            engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.02);
+                            engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.02);
+                        } else {
+                            if (throttle > 0 && rpmInGear > 4200 && currentGear < 5) {
+                                currentGear++;
+                                gearShiftTimer = 0.4;
+                            }
+                            if (throttle <= 0 && rpmInGear < 1500 && currentGear > 1) {
+                                currentGear--;
+                            }
+                            engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.05);
+                            engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.05);
                         }
-                        if (throttle <= 0 && rpmInGear < 1500 && currentGear > 1) {
-                            currentGear--;
-                        }
-                        engineOsc.frequency.setTargetAtTime(rpmInGear / 10, audioCtx.currentTime, 0.05);
-                        engineOsc2.frequency.setTargetAtTime(rpmInGear / 5, audioCtx.currentTime, 0.05);
+
+                        engineFilter.frequency.setTargetAtTime(300 + rpmInGear, audioCtx.currentTime, 0.05);
+                        engineGain.gain.value = 0.005 + Math.min(engineSpeed * 0.0002, 0.01) + (throttle > 0 ? 0.003 : 0);
+                        if (engineGainB) engineGainB.gain.value = 0;
                     }
-
-                    engineFilter.frequency.setTargetAtTime(300 + rpmInGear, audioCtx.currentTime, 0.05);
-                    engineGain.gain.value = 0.005 + Math.min(engineSpeed * 0.0002, 0.01) + (throttle > 0 ? 0.003 : 0);
                 }
             }
 
@@ -4735,6 +4799,7 @@
                 sirenSpot: null, sirenOn: false, sirenElapsed: 0,
                 camPos: new THREE.Vector3(), camLook: new THREE.Vector3(), camSnap: true,
                 camOrbit: 0, camDist: 8, camHeight: 3.4,
+                gearState: { gear: 1, shift: 0 },
                 topKmh: 0
             };
             if (isPolice) {
