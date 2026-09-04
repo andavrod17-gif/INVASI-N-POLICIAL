@@ -456,12 +456,19 @@
             min-height: 20px;
             letter-spacing: 0.4px;
         }
+        .countback {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(5, 10, 20, 0.55);
+            z-index: 29;
+        }
         .countdown {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -60%);
-            font-size: 120px;
+            font-size: 150px;
             font-weight: 900;
             color: #fff;
             text-shadow: 0 0 30px rgba(96,165,250,0.9), 0 4px 20px rgba(0,0,0,0.5);
@@ -473,7 +480,7 @@
         .countdown.go {
             color: #4ade80;
             text-shadow: 0 0 40px rgba(74,222,128,0.9), 0 4px 20px rgba(0,0,0,0.5);
-            font-size: 90px;
+            font-size: 110px;
         }
         @keyframes fadePulse {
             0% { transform: translate(-50%, -60%) scale(1); opacity: 1; }
@@ -740,7 +747,8 @@
             </div>
         </div>
         <div class="hud-feed" id="hudFeed"></div>
-        <div class="countdown" id="countdown" style="display:none"></div>
+        <div class="countback" id="countback" style="display:none"></div>
+    <div class="countdown" id="countdown" style="display:none"></div>
         <div class="hud-bottom">
             <span class="speed-val" id="hudSpeed">0</span><span class="speed-unit">km/h</span>
             <div style="font-size:11px;color:#7d8ba1" id="hudGear">Marcha 1 · RPM 0</div>
@@ -780,7 +788,7 @@
         </div>
     </div>
 
-    <div id="info">W <span style="color:#aaa">adelante</span> | A/D <span style="color:#aaa">girar</span> | S <span style="color:#aaa">freno/reversa</span> | Shift <span style="color:#aaa">derrapar</span> | F <span style="color:#aaa">sirena</span> | C o 1/2/3 <span style="color:#aaa">cámaras</span> | ESC <span style="color:#aaa">menú</span></div>
+    <div id="info">W <span style="color:#aaa">adelante</span> | A/D <span style="color:#aaa">girar</span> | S <span style="color:#aaa">freno/reversa</span> | Shift <span style="color:#aaa">derrapar</span> | F <span style="color:#aaa">sirena</span> | C o 1/2/3 <span style="color:#aaa">cámaras</span> | ESC <span style="color:#aaa">menú</span> | 🎮 <span style="color:#aaa">mando:</span> palanca <span style="color:#aaa">giro</span>, gatillo D <span style="color:#aaa">adelante</span>, X <span style="color:#aaa">sirena</span>, A <span style="color:#aaa">turbo</span></div>
     <div id="loading">Cargando modelo 3D...</div>
     <div id="error"></div>
 
@@ -2328,6 +2336,7 @@ sun.shadow.bias = -0.001;
             onlineShown = 0;
             onlineCountEl.style.display = 'none';
             onlineCountEl.classList.remove('go');
+            document.getElementById('countback').style.display = 'none';
         }
         function onlineSetStatus(txt, isErr) {
             olStatus.textContent = txt;
@@ -2504,6 +2513,7 @@ sun.shadow.bias = -0.001;
                     onlineShown = 0;
                     onlineCountEl.style.display = 'none';
                     onlineCountEl.classList.remove('go');
+                    document.getElementById('countback').style.display = 'none';
                     break;
                 case 'opponent_state':
                     var st = msg.state || {};
@@ -4572,6 +4582,7 @@ sun.shadow.bias = -0.001;
             var dt = Math.min((now - lastTime) / 1000, 0.05);
             lastTime = now;
             sun.shadow.needsUpdate = true;
+            updateControllerInput();
 
             if (gameStarted && (car || splitActive)) {
                 // Cuenta regresiva de inicio (3-2-1): el coche no se mueve hasta el ¡YA!
@@ -4584,6 +4595,7 @@ sun.shadow.bias = -0.001;
                         onlineCountEl.style.display = 'block';
                         onlineCountEl.textContent = disp;
                         onlineCountEl.classList.remove('go');
+                        document.getElementById('countback').style.display = 'block';
                         feedText('🚨 ¡PREPÁRATE!, en 3…2…1…', '#ffd270');
                     }
                     if (onlineCountT >= 3) {
@@ -4591,7 +4603,7 @@ sun.shadow.bias = -0.001;
                         onlineCountEl.classList.add('go');
                         onlineCountEl.textContent = '¡YA!';
                         feedText('🟢 ¡CORRE!', '#4ade80');
-                        setTimeout(function () { onlineCountEl.style.display = 'none'; }, 900);
+                        setTimeout(function () { onlineCountEl.style.display = 'none'; document.getElementById('countback').style.display = 'none'; }, 900);
                     }
                     if (splitActive) {
                         updateSplitCameras(dt);
@@ -4755,6 +4767,75 @@ sun.shadow.bias = -0.001;
             if (m[1] === 'q') P.active = false;
         });
 
+        // ===== SOPORTE DE MANDO (Gamepad) =====
+        // Mando 0 = jugador solo (o P1 en dividida) · Mando 1 = P2 en dividida
+        // palanca = giro, gatillo derecho/acelerar = adelante, gatillo izquierdo = freno,
+        // RB = derrape, A = turbo, X = sirena
+        var gamepadPrev = {};
+        var gamepadOwner = {};
+        var gpSem = ['w', 'a', 's', 'd', 'shift'];
+
+        function gpClear(ownerObj) {
+            for (var gpi = 0; gpi < gpSem.length; gpi++) ownerObj[gpSem[gpi]] = false;
+        }
+
+        function gpApply(k, g, gi, splitIdx) {
+            var ax = g.axes[0] || 0, ay = g.axes[1] || 0;
+            var b = g.buttons;
+            function pd(n) { return b[n] && b[n].pressed; }
+            k['w'] = pd(7) || ay < -0.3;
+            k['s'] = pd(6) || ay > 0.3;
+            k['a'] = ax < -0.25;
+            k['d'] = ax > 0.25;
+            k['shift'] = pd(4);
+            if (!gamepadPrev[gi]) gamepadPrev[gi] = [];
+            var prev = gamepadPrev[gi];
+            if (pd(0) && !prev[0]) {
+                if (splitActive && splitIdx >= 0) activateSplitTurbo(splitIdx);
+                else if (car && gameStarted && !gameEnded) activateTurbo();
+            }
+            if (!pd(0) && prev[0]) {
+                if (splitActive && splitIdx >= 0 && splitPlayers[splitIdx]) splitPlayers[splitIdx].active = false;
+                else turboActive = false;
+            }
+            if (pd(2) && !prev[2]) {
+                if (splitActive && splitIdx >= 0 && splitPlayers[splitIdx]) {
+                    var sp = splitPlayers[splitIdx];
+                    if (sp.sirenSpot) sp.sirenOn = !sp.sirenOn;
+                } else if (sirenSpot) sirenOn = !sirenOn;
+            }
+            for (var gpn = 0; gpn < 17; gpn++) prev[gpn] = pd(gpn);
+        }
+
+        function updateControllerInput() {
+            if (!window.navigator || !navigator.getGamepads) return;
+            var pads, seen = {};
+            try { pads = navigator.getGamepads(); } catch (e) { return; }
+            for (var i = 0; i < (pads ? pads.length : 0); i++) {
+                var g = pads[i];
+                if (!g || !g.connected || !g.axes || !g.buttons) continue;
+                seen[g.index] = true;
+                var owner;
+                if (splitActive) {
+                    if (g.index > 1) continue;
+                    var pp = splitPlayers[g.index];
+                    if (!pp) continue;
+                    owner = pp.keys;
+                } else {
+                    if (g.index !== 0) continue;
+                    owner = keys;
+                }
+                gamepadOwner[g.index] = owner;
+                gpApply(owner, g, g.index, splitActive ? g.index : -1);
+            }
+            for (var gi in gamepadOwner) {
+                if (!seen[gi]) {
+                    gpClear(gamepadOwner[gi]);
+                    delete gamepadOwner[gi];
+                }
+            }
+        }
+
         function buildSplitCar(modelKey, isPolice) {
             var src = carModels[modelKey];
             if (!src) return null;
@@ -4832,6 +4913,7 @@ sun.shadow.bias = -0.001;
             renderer.setScissorTest(false);
             onlineCount = 0;
             onlineCountEl.style.display = 'none';
+            document.getElementById('countback').style.display = 'none';
         }
 
         function startSplit() {
@@ -4878,7 +4960,7 @@ sun.shadow.bias = -0.001;
             document.getElementById('splitHud').style.display = '';
             document.getElementById('hudFeed').textContent = '';
             document.getElementById('hudFeed').style.opacity = 0;
-            document.getElementById('info').textContent = 'P1: WASD · Shift izq derrape · Q turbo · F sirena      |      P2: Flechas · Shift der derrape · P turbo';
+            document.getElementById('info').textContent = 'P1: WASD · Shift izq derrape · Q turbo · F sirena      |      P2: Flechas · Shift der derrape · P turbo      |      🎮 Mandos: Mando 1 = P1, Mando 2 = P2';
 
             // Cuenta regresiva 3-2-1 compartida
             onlineCount = 3;
@@ -4887,6 +4969,7 @@ sun.shadow.bias = -0.001;
             onlineCountEl.classList.remove('go');
             onlineCountEl.style.display = 'block';
             onlineCountEl.textContent = '3';
+            document.getElementById('countback').style.display = 'block';
             feedText('🖥️ ¡PANTALLA DIVIDIDA!', '#60a5fa');
             updateSplitCameras(0.016);
             renderSplit();
